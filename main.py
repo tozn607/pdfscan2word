@@ -56,7 +56,7 @@ class PDFOCRApp(ctk.CTk):
         self.lbl_toolbar.pack(side="left", padx=(20, 10), pady=10)
 
         # Nút gộp ảnh với nền xanh lá nổi bật
-        self.btn_merge = ctk.CTkButton(self.frame_menu, text="[+] GỘP ẢNH THÀNH PDF", font=("Arial", 12, "bold"), 
+        self.btn_merge = ctk.CTkButton(self.frame_menu, text="GỘP ẢNH THÀNH PDF", font=("Arial", 12, "bold"), 
                                        fg_color="#2b7a4b", hover_color="#1e5c37", text_color="white", 
                                        command=self.open_merge_popup)
         self.btn_merge.pack(side="left", padx=5, pady=10)
