@@ -4,6 +4,10 @@ import webbrowser
 import sys
 import time
 import threading
+# --- MACOS CRASH FIX ---
+if sys.platform == "darwin":
+    os.environ["PATH"] += os.pathsep + "/usr/local/bin" + os.pathsep + "/opt/homebrew/bin"
+# --------------------------------------------------------
 import customtkinter as ctk
 from tkinter import filedialog
 from pdf2image import convert_from_path
@@ -12,8 +16,9 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pypandoc
 from PIL import Image
 
+
 # --- CẤU HÌNH PHIÊN BẢN VÀ CẬP NHẬT ---
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.0.1"
 UPDATE_RAW_URL = "https://raw.githubusercontent.com/tozn607/pdfscan2word/main/version.txt"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
