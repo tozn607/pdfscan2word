@@ -37,7 +37,7 @@ jobs:
 
     - name: Đóng gói thành file EXE bằng PyInstaller
       run: |
-        pyinstaller --noconsole --windowed --collect-all customtkinter --name PDFScan2Word main.py
+        pyinstaller --noconsole --windowed --onefile --collect-all customtkinter --name PDFScan2Word main.py
 
     - name: Nén file EXE thành ZIP
       run: |
