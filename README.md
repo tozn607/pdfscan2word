@@ -74,7 +74,7 @@ Nếu bạn muốn đóng gói mã nguồn thành một file thực thi duy nh�
    ```
 2. Chạy lệnh Build:
    ```bash
-   pyinstaller --noconsole --windowed --collect-all customtkinter main.py
+   pyinstaller --noconsole --windowed --collect-all customtkinter --name PDFScan2Word main.py
    ```
 3. Lấy file thành phẩm trong thư mục `dist/`.
 
