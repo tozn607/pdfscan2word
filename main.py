@@ -48,7 +48,7 @@ class PDFOCRApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("PDF OCR to Word (Gemini-3.1)")
+        self.title("Scanned Images to Word v" + CURRENT_VERSION)
         self.geometry("780x780")
         self.stop_event = threading.Event()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
