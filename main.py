@@ -390,7 +390,7 @@ class PDFOCRApp(ctk.CTk):
         dialog.attributes("-topmost", True)
         dialog.grab_set()
         
-        lbl = ctk.CTkLabel(dialog, text=f"[*] Có phiên bản mới: v{latest_version}\n[*] Phiên bản hiện tại: v{CURRENT_VERSION}\n\nBạn có muốn tải bản cập nhật về không?", font=("Arial", 14))
+        lbl = ctk.CTkLabel(dialog, text=f"Có phiên bản mới: v{latest_version}\nPhiên bản hiện tại: v{CURRENT_VERSION}\n\nBạn có muốn tải bản cập nhật về không?", font=("Arial", 14))
         lbl.pack(pady=30)
         
         btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
