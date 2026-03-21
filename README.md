@@ -13,8 +13,6 @@ Khác với các công cụ OCR truyền thống (như Tesseract) thường làm
 
 ## 📸 Ảnh chụp màn hình
 
-*(Thêm link ảnh chụp phần mềm của bạn vào đây)*
-
 ![Giao diện chính](readme/1.png)
 *Giao diện làm việc với chế độ Đơn và Hàng loạt*
 

@@ -1,13 +1,17 @@
-name: Build Windows EXE
+name: Build Windows EXE & Upload to Release
 
+# Thay đổi trigger: Chỉ chạy khi một Release mới được xuất bản
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
-  build:
+  build-and-upload:
     runs-on: windows-latest
+    
+    # Cấp quyền ghi (write) để máy chủ được phép tự động upload file vào Release của bạn
+    permissions:
+      contents: write
 
     steps:
     - name: Lấy mã nguồn về máy chủ
@@ -27,7 +31,6 @@ jobs:
     - name: Trích xuất Phiên bản từ main.py
       id: extract_version
       run: |
-        # Đọc file main.py và tìm dòng CURRENT_VERSION = "..."
         VERSION=$(python -c "import re; print(re.search(r'CURRENT_VERSION\s*=\s*[\"\'\']([^\"\'\']+)[\"\'\']', open('main.py', encoding='utf-8').read()).group(1))")
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
       shell: bash
@@ -36,8 +39,14 @@ jobs:
       run: |
         pyinstaller --noconsole --windowed --collect-all customtkinter --name PDFScan2Word main.py
 
-    - name: Nén và Tải lên GitHub
-      uses: actions/upload-artifact@v4
-      with:
-        name: PDFScan2Word-v${{ env.APP_VERSION }}-Windows
-        path: dist/PDFScan2Word.exe
+    - name: Nén file EXE thành ZIP
+      run: |
+        Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+      shell: powershell
+
+    - name: Đính kèm file ZIP Windows vào bài Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release upload ${{ github.event.release.tag_name }} PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+      shell: bash
