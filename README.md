@@ -1,1 +1,0 @@
-# pdfscan2word

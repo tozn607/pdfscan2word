@@ -1,8 +1,0 @@
-# MAC: brew install pandoc poppler
-# WINDOWS: Download Pandoc.msi from their website
-
-customtkinter
-pdf2image
-google-generativeai
-pypandoc
-Pillow

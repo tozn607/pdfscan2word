@@ -1,8 +1,0 @@
-path/
-api_key.txt
-test/
-path/
-__pycache__/
-build/
-dist/
-*.spec
