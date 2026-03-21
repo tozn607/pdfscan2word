@@ -1,15 +1,14 @@
 name: Build Windows EXE & Upload to Release
 
-# Thay đổi trigger: Chỉ chạy khi một Release mới được xuất bản
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build-and-upload:
     runs-on: windows-latest
     
-    # Cấp quyền ghi (write) để máy chủ được phép tự động upload file vào Release của bạn
     permissions:
       contents: write
 
@@ -44,7 +43,15 @@ jobs:
         Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
       shell: powershell
 
+    - name: Lưu file ZIP vào Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDFScan2Word-v${{ env.APP_VERSION }}-Windows
+        path: PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+
+    # THÊM ĐIỀU KIỆN: Chỉ đẩy vào trang Release NẾU sự kiện kích hoạt là do tạo Release
     - name: Đính kèm file ZIP Windows vào bài Release
+      if: github.event_name == 'release'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
