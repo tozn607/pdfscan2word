@@ -48,12 +48,15 @@ jobs:
       with:
         name: PDFScan2Word-v${{ env.APP_VERSION }}-Windows
         path: PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
-
-    # THÊM ĐIỀU KIỆN: Chỉ đẩy vào trang Release NẾU sự kiện kích hoạt là do tạo Release
-    - name: Đính kèm file ZIP Windows vào bài Release
-      if: github.event_name == 'release'
+        
+    - name: Đính kèm file ZIP Windows vào bài Release mới nhất
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release upload ${{ github.event.release.tag_name }} PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+        # Dùng GitHub CLI để hỏi xem cái tag của bài Release gần nhất tên là gì
+        LATEST_TAG=$(gh release view --json tagName -q .tagName)
+        echo "Đang upload vào Release: $LATEST_TAG"
+        
+        # Đẩy file ZIP lên bài Release đó (cờ --clobber giúp ghi đè nếu file đã tồn tại)
+        gh release upload $LATEST_TAG PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip --clobber
       shell: bash
