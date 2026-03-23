@@ -4,10 +4,13 @@ import webbrowser
 import sys
 import time
 import threading
+import tkinter as tk
+
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
     os.environ["PATH"] += os.pathsep + "/usr/local/bin" + os.pathsep + "/opt/homebrew/bin"
 # --------------------------------------------------------
+
 import customtkinter as ctk
 from tkinter import filedialog
 from pdf2image import convert_from_path
@@ -16,6 +19,12 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pypandoc
 from PIL import Image
 
+# --- HỖ TRỢ ĐỊNH DẠNG HEIF/HEIC CỦA APPLE ---
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except ImportError:
+    print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
 # --- CẤU HÌNH PHIÊN BẢN VÀ CẬP NHẬT ---
 CURRENT_VERSION = "1.0.1"
@@ -365,12 +374,15 @@ class PDFOCRApp(ctk.CTk):
         save_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF", "*.pdf")])
         if save_path:
             try:
+                # Pillow có thể mở HEIC nhờ pillow-heif đã register ở trên
                 imgs = [Image.open(p).convert('RGB') for p in self.selected_images_list]
                 imgs[0].save(save_path, save_all=True, append_images=imgs[1:])
-                self.img_listbox.configure(state="normal")
-                self.img_listbox.insert("end", f"\n[OK] Đã lưu PDF: {save_path}\n")
-                self.img_listbox.configure(state="disabled")
-            except Exception as e: pass
+                self.img_listbox.delete(0, 'end')
+                self.img_listbox.insert('end', f"--- THÀNH CÔNG ---")
+                self.img_listbox.insert('end', f"Đã lưu PDF: {save_path}")
+            except Exception as e: 
+                self.img_listbox.delete(0, 'end')
+                self.img_listbox.insert('end', f"[!] LỖI: {e}")
 
     # --- TÍNH NĂNG KIỂM TRA CẬP NHẬT TỪ GITHUB ---
     def check_for_updates(self):
