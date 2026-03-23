@@ -48,17 +48,17 @@ safety_config = {
 
 prompt_template = """
 Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
-Nhiệm vụ của bạn là trích xuất và làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
+Nhiệm vụ của bạn là trích xuất và  phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
 1. ƯU TIÊN SỐ 1 - BẢO TOÀN DANH SÁCH: Mọi mục bắt đầu bằng số (1., 2.), chữ cái (A., a.), hoặc gạch ngang (-) BẮT BUỘC nằm ở dòng riêng. KHÔNG nối vào dòng trước. 
-2. CÚ PHÁP MARKDOWN CHÍNH XÁC: 
-   - NẾU mục gốc được đánh số (1., 2.) hoặc chữ cái (a., b., A., B.), HÃY GIỮ NGUYÊN. TUYỆT ĐỐI KHÔNG chèn thêm dấu gạch ngang (`- `) ở đầu.
+2. CÚ PHÁP MARKDOWN CHÍNH XÁC (QUAN TRỌNG): 
+   - NẾU mục gốc được đánh số (1., 2.) hoặc chữ cái (a., b., A., B.), HÃY GIỮ NGUYÊN số/chữ cái đó (ví dụ: `a. Chủ tịch nước`). TUYỆT ĐỐI KHÔNG chèn thêm dấu gạch ngang (`- `) ở đầu.
    - CHỈ dùng dấu gạch ngang (`- `) cho các mục thực sự là gạch đầu dòng trong bản gốc.
-   - BẮT BUỘC chèn MỘT DÒNG TRẮNG trước và sau khối danh sách.
+   - BẮT BUỘC chèn MỘT DÒNG TRẮNG trước khi bắt đầu và sau khi kết thúc một khối danh sách.
 3. NỐI DÒNG THÔNG MINH: Chỉ nối nếu dòng dưới là phần đứt đoạn của câu trên. 
-4. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang (thường là các con số nằm trơ trọi ở mép trên hoặc mép dưới cùng của trang giấy). Hãy chủ động bỏ qua chúng.
-5. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc. Tiêu đề lớn in đậm và đứng riêng.
-6. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh để điền bù chữ khuất mép giấy. Xóa bỏ hoàn toàn các ký tự rác.
+4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc. Tiêu đề lớn in đậm và đứng riêng.
+5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung của đoạn văn để điền bù các chữ bị khuất ở mép giấy. Xóa bỏ hoàn toàn các ký tự rác do lỗi scan.
 Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
+6. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang (thường là các con số nằm trơ trọi ở mép trên hoặc mép dưới cùng của trang giấy). Hãy chủ động bỏ qua chúng.
 """
 
 class PDFOCRApp(ctk.CTk):
@@ -285,7 +285,7 @@ class PDFOCRApp(ctk.CTk):
         # DYNAMIC PROMPT: Nối thêm lệnh giải bài tập nếu được tick
         active_prompt = prompt_template
         if self.solve_var.get():
-            active_prompt += "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy viết đáp án ngay bên dưới từng câu hỏi, hoặc tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu."
+            active_prompt += "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó."
 
         for file_idx, pdf_path in enumerate(pdf_files):
             if self.stop_event.is_set(): break
