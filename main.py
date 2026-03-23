@@ -331,7 +331,7 @@ class PDFOCRApp(ctk.CTk):
     def open_merge_popup(self):
         self.merge_window = ctk.CTkToplevel(self)
         self.merge_window.title("Tiện ích: Gộp ảnh thành PDF")
-        self.merge_window.geometry("550x450")
+        self.merge_window.geometry("600x450")
         self.merge_window.attributes("-topmost", True)
         self.merge_window.grab_set()
 
@@ -340,15 +340,35 @@ class PDFOCRApp(ctk.CTk):
         frame_controls = ctk.CTkFrame(self.merge_window, fg_color="transparent")
         frame_controls.pack(pady=10, padx=20, fill="x")
 
-        btn_add = ctk.CTkButton(frame_controls, text="Chọn file ảnh", command=self.add_images)
+        # Nút Thêm
+        btn_add = ctk.CTkButton(frame_controls, text="Thêm ảnh", width=100, command=self.add_images)
         btn_add.pack(side="left", padx=5)
 
-        btn_clear = ctk.CTkButton(frame_controls, text="Xóa danh sách", fg_color="#a83232", command=self.clear_images)
+        # Nút Đảo vị trí
+        btn_up = ctk.CTkButton(frame_controls, text="▲ Lên", width=70, fg_color="#454545", hover_color="#5a5a5a", command=self.move_up)
+        btn_up.pack(side="left", padx=5)
+        
+        btn_down = ctk.CTkButton(frame_controls, text="▼ Xuống", width=70, fg_color="#454545", hover_color="#5a5a5a", command=self.move_down)
+        btn_down.pack(side="left", padx=5)
+
+        # Nút Xóa
+        btn_clear = ctk.CTkButton(frame_controls, text="Xóa hết", width=80, fg_color="#a83232", hover_color="#7a2121", command=self.clear_images)
         btn_clear.pack(side="left", padx=5)
 
-        self.img_listbox = ctk.CTkTextbox(self.merge_window, width=500, height=250, font=("Consolas", 12))
-        self.img_listbox.pack(pady=10, padx=20)
+        # Sử dụng Listbox của tkinter thay vì Textbox để có thể click chọn dòng
+        list_frame = tk.Frame(self.merge_window, bg="#343638")
+        list_frame.pack(pady=10, padx=20, fill="both", expand=True)
         
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Style Listbox cho giống Dark Mode
+        self.img_listbox = tk.Listbox(list_frame, font=("Consolas", 12), bg="#2b2b2b", fg="#ffffff", 
+                                      selectbackground="#1f538d", highlightthickness=0, borderwidth=0,
+                                      yscrollcommand=scrollbar.set)
+        self.img_listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=self.img_listbox.yview)
+
         btn_export = ctk.CTkButton(self.merge_window, text="XUẤT RA PDF", font=("Arial", 14, "bold"), fg_color="#2b7a4b", command=self.export_to_pdf)
         btn_export.pack(pady=10)
 
@@ -358,16 +378,34 @@ class PDFOCRApp(ctk.CTk):
             self.selected_images_list.extend(paths)
             self.update_image_listbox()
 
+    def move_up(self):
+        try:
+            idx = self.img_listbox.curselection()[0]
+            if idx > 0:
+                self.selected_images_list[idx-1], self.selected_images_list[idx] = self.selected_images_list[idx], self.selected_images_list[idx-1]
+                self.update_image_listbox()
+                self.img_listbox.select_set(idx-1) # Giữ trạng thái bôi đen
+        except IndexError:
+            pass # Chưa chọn dòng nào thì bỏ qua
+
+    def move_down(self):
+        try:
+            idx = self.img_listbox.curselection()[0]
+            if idx < len(self.selected_images_list) - 1:
+                self.selected_images_list[idx+1], self.selected_images_list[idx] = self.selected_images_list[idx], self.selected_images_list[idx+1]
+                self.update_image_listbox()
+                self.img_listbox.select_set(idx+1) # Giữ trạng thái bôi đen
+        except IndexError:
+            pass
+
     def clear_images(self):
         self.selected_images_list.clear()
         self.update_image_listbox()
 
     def update_image_listbox(self):
-        self.img_listbox.configure(state="normal")
-        self.img_listbox.delete("0.0", "end")
-        for i, path in enumerate(self.selected_images_list):
-            self.img_listbox.insert("end", f"[{i+1}] {os.path.basename(path)}\n")
-        self.img_listbox.configure(state="disabled")
+        self.img_listbox.delete(0, 'end')
+        for path in self.selected_images_list:
+            self.img_listbox.insert('end', os.path.basename(path))
 
     def export_to_pdf(self):
         if not self.selected_images_list: return
