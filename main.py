@@ -31,6 +31,10 @@ CURRENT_VERSION = "1.0.2"
 UPDATE_RAW_URL = "https://raw.githubusercontent.com/tozn607/pdfscan2word/main/version.txt"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
+# Tự động tìm thư mục Home của máy tính và tạo folder ẩn .pdfscan2word
+CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".pdfscan2word")
+API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
+
 # Cấu hình UI
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -161,14 +165,24 @@ class PDFOCRApp(ctk.CTk):
 
     def save_api_key(self, key):
         try:
-            with open("api_key.txt", "w") as f: f.write(key)
-        except: pass
+            # Tạo thư mục ẩn nếu chưa có
+            if not os.path.exists(CONFIG_DIR):
+                os.makedirs(CONFIG_DIR)
+            # Lưu file vào đúng đường dẫn tuyệt đối
+            with open(API_KEY_FILE, "w", encoding="utf-8") as f: 
+                f.write(key)
+        except Exception as e:
+            print(f"[!] Lỗi lưu API Key: {e}")
 
     def load_saved_api_key(self):
-        if os.path.exists("api_key.txt"):
-            with open("api_key.txt", "r") as f:
-                key = f.read().strip()
-                if key: self.entry_api.insert(0, key)
+        if os.path.exists(API_KEY_FILE):
+            try:
+                with open(API_KEY_FILE, "r", encoding="utf-8") as f:
+                    key = f.read().strip()
+                    if key: 
+                        self.entry_api.insert(0, key)
+            except Exception as e:
+                print(f"[!] Lỗi tải API Key: {e}")
 
     def load_api_from_file(self):
         filepath = filedialog.askopenfilename(title="Chọn file txt chứa API Key", filetypes=[("Text Files", "*.txt")])
