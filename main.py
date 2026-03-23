@@ -58,7 +58,7 @@ class PDFOCRApp(ctk.CTk):
         super().__init__()
 
         self.title("Scanned Images to Word v" + CURRENT_VERSION)
-        self.geometry("780x780")
+        self.geometry("780x800")
         self.stop_event = threading.Event()
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
@@ -116,6 +116,13 @@ class PDFOCRApp(ctk.CTk):
         self.btn_output.pack(side="left", padx=10, pady=10)
         self.entry_output = ctk.CTkEntry(self.frame_output, width=500, placeholder_text="Trống = Lưu cùng thư mục với Tool")
         self.entry_output.pack(side="left", padx=10, pady=10)
+
+        # --- TÙY CHỌN GIẢI BÀI TẬP  ---
+        self.frame_options = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_options.pack(pady=0, padx=20, fill="x")
+        self.solve_var = ctk.BooleanVar(value=False)
+        self.chk_solve = ctk.CTkCheckBox(self.frame_options, text="🤖 Yêu cầu AI Giải bài tập / Trả lời câu hỏi có trong tài liệu", variable=self.solve_var, font=("Arial", 12, "bold"))
+        self.chk_solve.pack(side="left", padx=10)
 
         # --- 4. NÚT ĐIỀU KHIỂN ---
         self.frame_buttons = ctk.CTkFrame(self, fg_color="transparent")
@@ -254,6 +261,11 @@ class PDFOCRApp(ctk.CTk):
         self.write_log(f"\n[>>>] BẮT ĐẦU: Sẽ xử lý {total_files} file PDF.")
         model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
 
+        # DYNAMIC PROMPT: Nối thêm lệnh giải bài tập nếu được tick
+        active_prompt = prompt_template
+        if self.solve_var.get():
+            active_prompt += "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy viết đáp án ngay bên dưới từng câu hỏi, hoặc tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu."
+
         for file_idx, pdf_path in enumerate(pdf_files):
             if self.stop_event.is_set(): break
 
@@ -281,7 +293,7 @@ class PDFOCRApp(ctk.CTk):
                 for attempt in range(max_retries):
                     if self.stop_event.is_set(): break
                     try:
-                        response = model.generate_content([prompt_template, image], safety_settings=safety_config)
+                        response = model.generate_content([active_prompt, image], safety_settings=safety_config)
                         
                         try:
                             text_result = response.text
@@ -368,7 +380,7 @@ class PDFOCRApp(ctk.CTk):
                                       yscrollcommand=scrollbar.set)
         self.img_listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.img_listbox.yview)
-
+        
         btn_export = ctk.CTkButton(self.merge_window, text="XUẤT RA PDF", font=("Arial", 14, "bold"), fg_color="#2b7a4b", command=self.export_to_pdf)
         btn_export.pack(pady=10)
 
