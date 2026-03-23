@@ -353,7 +353,7 @@ class PDFOCRApp(ctk.CTk):
         btn_export.pack(pady=10)
 
     def add_images(self):
-        paths = filedialog.askopenfilenames(filetypes=[("Image Files", "*.png *.jpg *.jpeg *.bmp")])
+        paths = filedialog.askopenfilenames(filetypes=[("Image Files", "*.png *.jpg *.jpeg *.bmp *.heic *.heif")])
         if paths:
             self.selected_images_list.extend(paths)
             self.update_image_listbox()
