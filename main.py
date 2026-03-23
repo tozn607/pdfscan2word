@@ -148,8 +148,13 @@ class PDFOCRApp(ctk.CTk):
         self.log_box.insert("0.0", "[*] Ứng dụng đã sẵn sàng. Hãy chọn file/thư mục để bắt đầu.\n")
         self.log_box.configure(state="disabled")
 
-        # Khởi chạy luồng kiểm tra cập nhật ngầm
+        # --- Khởi chạy luồng kiểm tra cập nhật ngầm ---
         threading.Thread(target=self.check_for_updates, daemon=True).start()
+
+        # --- 6. FOOTER (CHỮ KÝ & PHIÊN BẢN) ---
+        footer_text = f"Developed by tozn607 | Version v{CURRENT_VERSION} | © 2026"
+        self.lbl_footer = ctk.CTkLabel(self, text=footer_text, text_color="gray50", font=("Arial", 13))
+        self.lbl_footer.pack(side="bottom", pady=(0, 10))
 
     # --- HÀM THAY ĐỔI GIAO DIỆN THEO CHẾ ĐỘ ---
     def change_mode(self, selected_mode):
