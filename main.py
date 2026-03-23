@@ -27,7 +27,7 @@ except ImportError:
     print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
 # --- CẤU HÌNH PHIÊN BẢN VÀ CẬP NHẬT ---
-CURRENT_VERSION = "1.0.1"
+CURRENT_VERSION = "1.0.2"
 UPDATE_RAW_URL = "https://raw.githubusercontent.com/tozn607/pdfscan2word/main/version.txt"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
@@ -380,7 +380,7 @@ class PDFOCRApp(ctk.CTk):
                                       yscrollcommand=scrollbar.set)
         self.img_listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.img_listbox.yview)
-        
+
         btn_export = ctk.CTkButton(self.merge_window, text="XUẤT RA PDF", font=("Arial", 14, "bold"), fg_color="#2b7a4b", command=self.export_to_pdf)
         btn_export.pack(pady=10)
 
