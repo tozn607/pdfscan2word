@@ -47,14 +47,17 @@ safety_config = {
 }
 
 prompt_template = """
-Bạn là một biên tập viên tu thư chuyên nghiệp. Dưới đây là hình ảnh scan của giáo trình môn Giáo dục Quốc phòng và An ninh. 
-Nhiệm vụ của bạn là trích xuất và phục hồi văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
+Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
+Nhiệm vụ của bạn là trích xuất và làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
 1. ƯU TIÊN SỐ 1 - BẢO TOÀN DANH SÁCH: Mọi mục bắt đầu bằng số (1., 2.), chữ cái (A., a.), hoặc gạch ngang (-) BẮT BUỘC nằm ở dòng riêng. KHÔNG nối vào dòng trước. 
-2. CÚ PHÁP DANH SÁCH: Dùng Markdown (`- `). BẮT BUỘC chèn MỘT DÒNG TRẮNG trước và sau khối danh sách.
+2. CÚ PHÁP MARKDOWN CHÍNH XÁC (QUAN TRỌNG): 
+   - NẾU mục gốc được đánh số (1., 2.) hoặc chữ cái (a., b., A., B.), HÃY GIỮ NGUYÊN số/chữ cái đó (ví dụ: `a. Chủ tịch nước`). TUYỆT ĐỐI KHÔNG chèn thêm dấu gạch ngang (`- `) ở đầu.
+   - CHỈ dùng dấu gạch ngang (`- `) cho các mục thực sự là gạch đầu dòng trong bản gốc.
+   - BẮT BUỘC chèn MỘT DÒNG TRẮNG trước khi bắt đầu và sau khi kết thúc một khối danh sách.
 3. NỐI DÒNG THÔNG MINH: Chỉ nối nếu dòng dưới là phần đứt đoạn của câu trên. 
 4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc. Tiêu đề lớn in đậm và đứng riêng.
-5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh để điền bù chữ khuất mép giấy. Xóa ký tự rác.
-Chỉ trả về văn bản bằng Markdown, không giải thích.
+5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung của đoạn văn để điền bù các chữ bị khuất ở mép giấy. Xóa bỏ hoàn toàn các ký tự rác do lỗi scan.
+Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
 """
 
 class PDFOCRApp(ctk.CTk):
