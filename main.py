@@ -159,20 +159,22 @@ class PDFOCRApp(ctk.CTk):
 
     # --- HÀM ĐIỀU KHIỂN HỆ THỐNG VÀ API KEY ---
     def on_closing(self):
+        current_key = self.entry_api.get().strip()
+        if current_key:
+            self.save_api_key(current_key)
+
         self.stop_event.set() 
         self.destroy() 
-        os._exit(0) 
+        os._exit(0)
 
     def save_api_key(self, key):
         try:
-            # Tạo thư mục ẩn nếu chưa có
             if not os.path.exists(CONFIG_DIR):
                 os.makedirs(CONFIG_DIR)
-            # Lưu file vào đúng đường dẫn tuyệt đối
             with open(API_KEY_FILE, "w", encoding="utf-8") as f: 
                 f.write(key)
         except Exception as e:
-            print(f"[!] Lỗi lưu API Key: {e}")
+            print(f"Lỗi khi lưu key: {e}")
 
     def load_saved_api_key(self):
         if os.path.exists(API_KEY_FILE):
@@ -180,9 +182,10 @@ class PDFOCRApp(ctk.CTk):
                 with open(API_KEY_FILE, "r", encoding="utf-8") as f:
                     key = f.read().strip()
                     if key: 
+                        self.entry_api.delete(0, "end")
                         self.entry_api.insert(0, key)
             except Exception as e:
-                print(f"[!] Lỗi tải API Key: {e}")
+                print(f"Lỗi khi load key: {e}")
 
     def load_api_from_file(self):
         filepath = filedialog.askopenfilename(title="Chọn file txt chứa API Key", filetypes=[("Text Files", "*.txt")])
