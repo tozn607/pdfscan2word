@@ -122,7 +122,7 @@ class PDFOCRApp(ctk.CTk):
         self.frame_output.pack(pady=5, padx=20, fill="x")
         self.btn_output = ctk.CTkButton(self.frame_output, text="Thư mục Output", width=120, command=self.browse_output)
         self.btn_output.pack(side="left", padx=10, pady=10)
-        self.entry_output = ctk.CTkEntry(self.frame_output, width=500, placeholder_text="Trống = Tự động lưu cùng nơi với File/Thư mục Input"
+        self.entry_output = ctk.CTkEntry(self.frame_output, width=500, placeholder_text="Trống = Tự động lưu cùng nơi với File/Thư mục Input")
         self.entry_output.pack(side="left", padx=10, pady=10)
 
         # --- CÁC TÙY CHỌN MỞ RỘNG ---
