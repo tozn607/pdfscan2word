@@ -125,12 +125,18 @@ class PDFOCRApp(ctk.CTk):
         self.entry_output = ctk.CTkEntry(self.frame_output, width=500, placeholder_text="Trống = Lưu cùng thư mục với Tool")
         self.entry_output.pack(side="left", padx=10, pady=10)
 
-        # --- TÙY CHỌN GIẢI BÀI TẬP  ---
+        # --- CÁC TÙY CHỌN MỞ RỘNG ---
         self.frame_options = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_options.pack(pady=0, padx=20, fill="x")
+        self.frame_options.pack(pady=5, padx=20, fill="x")
+        
         self.solve_var = ctk.BooleanVar(value=False)
-        self.chk_solve = ctk.CTkCheckBox(self.frame_options, text="🤖 Yêu cầu AI Giải bài tập / Trả lời câu hỏi có trong tài liệu", variable=self.solve_var, font=("Arial", 12, "bold"))
+        self.chk_solve = ctk.CTkCheckBox(self.frame_options, text="🤖 Yêu cầu AI Giải bài tập", variable=self.solve_var, font=("Arial", 12, "bold"))
         self.chk_solve.pack(side="left", padx=10)
+
+        # Checkbox mới: Lưu riêng trang bìa
+        self.cover_var = ctk.BooleanVar(value=False)
+        self.chk_cover = ctk.CTkCheckBox(self.frame_options, text="🖼️ Lưu riêng trang bìa (Bỏ qua Scan trang 1)", variable=self.cover_var, font=("Arial", 12, "bold"))
+        self.chk_cover.pack(side="left", padx=15)
 
         # --- 4. NÚT ĐIỀU KHIỂN ---
         self.frame_buttons = ctk.CTkFrame(self, fg_color="transparent")
@@ -306,10 +312,29 @@ class PDFOCRApp(ctk.CTk):
                 self.write_log(f"  [X] LỖI ĐỌC PDF: {e}")
                 continue 
 
+            if not images:
+                continue
+
+            # --- XỬ LÝ TRANG BÌA ---
+            start_idx = 0
+            if self.cover_var.get():
+                # Tạo tên file ảnh bìa: "TenFilePDF_cover.jpg"
+                cover_path = os.path.join(output_dir, f"{base_name}_cover.jpg")
+                try:
+                    images[0].save(cover_path, "JPEG")
+                    self.write_log(f"  [+] Đã lưu ảnh bìa: {base_name}_cover.jpg")
+                except Exception as e:
+                    self.write_log(f"  [!] Lỗi khi lưu ảnh bìa: {e}")
+                
+                # Bắt đầu vòng lặp đọc chữ từ trang số 2 (index 1)
+                start_idx = 1 
+
             full_markdown_content = ""
             max_retries = 5 
 
-            for i, image in enumerate(images):
+            # Thay vì dùng enumerate(images), dùng range để kiểm soát điểm bắt đầu
+            for i in range(start_idx, len(images)):
+                image = images[i]
                 if self.stop_event.is_set():
                     self.write_log("  [-] Bỏ dở tài liệu này do lệnh Dừng.")
                     break
