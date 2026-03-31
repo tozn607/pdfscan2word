@@ -48,17 +48,22 @@ safety_config = {
 
 prompt_template = """
 Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
-Nhiệm vụ của bạn là trích xuất và  phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
+Nhiệm vụ của bạn là trích xuất và phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
 1. ƯU TIÊN SỐ 1 - BẢO TOÀN DANH SÁCH: Mọi mục bắt đầu bằng số (1., 2.), chữ cái (A., a.), hoặc gạch ngang (-) BẮT BUỘC nằm ở dòng riêng. KHÔNG nối vào dòng trước. 
 2. CÚ PHÁP MARKDOWN CHÍNH XÁC (QUAN TRỌNG): 
-   - NẾU mục gốc được đánh số (1., 2.) hoặc chữ cái (a., b., A., B.), HÃY GIỮ NGUYÊN số/chữ cái đó (ví dụ: `a. Chủ tịch nước`). TUYỆT ĐỐI KHÔNG chèn thêm dấu gạch ngang (`- `) ở đầu.
+   - NẾU mục gốc được đánh số (1., 2.) hoặc chữ cái (a., b., A., B.), HÃY GIỮ NGUYÊN. TUYỆT ĐỐI KHÔNG chèn thêm dấu gạch ngang (`- `) ở đầu.
    - CHỈ dùng dấu gạch ngang (`- `) cho các mục thực sự là gạch đầu dòng trong bản gốc.
    - BẮT BUỘC chèn MỘT DÒNG TRẮNG trước khi bắt đầu và sau khi kết thúc một khối danh sách.
 3. NỐI DÒNG THÔNG MINH: Chỉ nối nếu dòng dưới là phần đứt đoạn của câu trên. 
 4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc. Tiêu đề lớn in đậm và đứng riêng.
-5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung của đoạn văn để điền bù các chữ bị khuất ở mép giấy. Xóa bỏ hoàn toàn các ký tự rác do lỗi scan.
+5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung để điền bù chữ khuất mép giấy. Xóa bỏ hoàn toàn ký tự rác.
+6. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang. Hãy chủ động bỏ qua chúng.
+7. XỬ LÝ CHÚ THÍCH (FOOTNOTE): NẾU trang tài liệu có chú thích ở dưới cùng (thường có số nhỏ/dấu sao ngăn cách bởi đường kẻ ngang):
+   - BẮT BUỘC dùng cú pháp Footnote của Markdown.
+   - Đặt mốc `[^1]`, `[^2]`... sát ngay sau từ/câu được chú thích trong đoạn văn.
+   - Ghi nội dung chú thích ở tận cùng của văn bản theo cú pháp: `[^1]: Nội dung chú thích...`
+   - TUYỆT ĐỐI KHÔNG để nội dung chú thích nằm lẫn lộn giữa văn bản thường.
 Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
-6. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang (thường là các con số nằm trơ trọi ở mép trên hoặc mép dưới cùng của trang giấy). Hãy chủ động bỏ qua chúng.
 """
 
 class PDFOCRApp(ctk.CTk):
@@ -358,6 +363,11 @@ class PDFOCRApp(ctk.CTk):
                             text_result = f"> **[LỖI: TỪ CHỐI NHẬN DIỆN TRANG {i+1} DO VƯỚNG BẢN QUYỀN]**"
                             full_markdown_content += f"\n\n\n\n{text_result}\n\n"
                             break
+                        
+                        # [TRICK XỬ LÝ FOOTNOTE] 
+                        # Biến [^1] thành [^p1_1], [^p2_1] để tránh các trang bị trùng ID footnote của nhau khi gộp lại.
+                        # Pandoc sẽ tự động sắp xếp và đánh số lại từ 1, 2, 3... trong Word một cách hoàn hảo.
+                        text_result = text_result.replace("[^", f"[^p{i}_")
                         
                         full_markdown_content += f"\n\n\n\n{text_result}\n\n"
                         
