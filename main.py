@@ -68,11 +68,14 @@ Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
 
 class PDFOCRApp(ctk.CTk):
     def __init__(self):
+        
         super().__init__()
 
         self.title("Scanned Images to Word v" + CURRENT_VERSION)
         self.geometry("780x800")
         self.stop_event = threading.Event()
+        self.start_time = None
+        self.timer_running = False
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         # --- 0. MENU BAR TRÊN CÙNG ---
@@ -157,6 +160,10 @@ class PDFOCRApp(ctk.CTk):
 
         self.btn_stop = ctk.CTkButton(self.frame_buttons, text="⏹ DỪNG LẠI", font=("Arial", 14, "bold"), fg_color="#a83232", hover_color="#7a2121", state="disabled", command=self.stop_processing)
         self.btn_stop.pack(side="left", padx=10)
+
+        # --- ĐỒNG HỒ ĐẾM GIỜ ---
+        self.lbl_timer = ctk.CTkLabel(self, text="Thời gian xử lý: 00:00", font=("Arial", 13, "bold"), text_color="#3a7ebf")
+        self.lbl_timer.pack(pady=(0, 5))
 
         # --- 5. LOG TRUNG TÂM ---
         self.log_box = ctk.CTkTextbox(self, width=740, height=350, font=("Consolas", 13))
@@ -290,6 +297,11 @@ class PDFOCRApp(ctk.CTk):
             return
 
         self.save_api_key(api_key)
+
+        # Bắt đầu tính giờ
+        self.start_time = datetime.now()
+        self.timer_running = True
+        self.update_timer_ui()
 
         self.btn_start.configure(state="disabled")
         self.btn_input.configure(state="disabled")
@@ -442,6 +454,7 @@ class PDFOCRApp(ctk.CTk):
         self.reset_ui()
 
     def reset_ui(self):
+        self.timer_running = False # Dừng đồng hồ
         self.btn_start.configure(state="normal")
         self.btn_input.configure(state="normal")
         self.btn_output.configure(state="normal")
@@ -542,6 +555,15 @@ class PDFOCRApp(ctk.CTk):
             except Exception as e: 
                 self.img_listbox.delete(0, 'end')
                 self.img_listbox.insert('end', f"[!] LỖI: {e}")
+
+    # --- TÍNH NĂNG ĐỒNG HỒ ĐẾM GIỜ ---
+    def update_timer_ui(self):
+        if self.timer_running and self.start_time:
+            delta = datetime.now() - self.start_time
+            minutes, seconds = divmod(int(delta.total_seconds()), 60)
+            self.lbl_timer.configure(text=f"Thời gian xử lý: {minutes:02d}:{seconds:02d}")
+            # Cập nhật mỗi giây một lần
+            self.after(1000, self.update_timer_ui)
 
     # --- TÍNH NĂNG KIỂM TRA CẬP NHẬT TỪ GITHUB ---
     def check_for_updates(self):
