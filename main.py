@@ -5,6 +5,7 @@ import sys
 import time
 import threading
 import tkinter as tk
+from datetime import datetime
 
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
@@ -162,9 +163,23 @@ class PDFOCRApp(ctk.CTk):
         threading.Thread(target=self.check_for_updates, daemon=True).start()
 
         # --- 6. FOOTER (CHỮ KÝ & PHIÊN BẢN) ---
-        footer_text = f"Developed by tozn607 | Version v{CURRENT_VERSION} | © 2026"
-        self.lbl_footer = ctk.CTkLabel(self, text=footer_text, text_color="gray50", font=("Arial", 13))
-        self.lbl_footer.pack(side="bottom", pady=(0, 10))
+        self.frame_footer = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_footer.pack(side="bottom", pady=(0, 10))
+
+        today = datetime.now()
+        build_str = today.strftime("%Y%m%d")
+        year_str = today.strftime("%Y")
+
+        lbl_dev_prefix = ctk.CTkLabel(self.frame_footer, text="Developed by ", text_color="gray50", font=("Arial", 12))
+        lbl_dev_prefix.pack(side="left")
+
+        lbl_link = ctk.CTkLabel(self.frame_footer, text="@tozn607", text_color="#1f6aa5", font=("Arial", 12, "bold", "underline"), cursor="hand2")
+        lbl_link.pack(side="left")
+        # Gắn sự kiện: Bấm chuột trái (<Button-1>) sẽ mở trình duyệt tới link GitHub
+        lbl_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/tozn607"))
+
+        lbl_version_suffix = ctk.CTkLabel(self.frame_footer, text=f" | Version v{CURRENT_VERSION} Build {build_str} | © {year_str}", text_color="gray50", font=("Arial", 12))
+        lbl_version_suffix.pack(side="left")
 
     # --- HÀM THAY ĐỔI GIAO DIỆN THEO CHẾ ĐỘ ---
     def change_mode(self, selected_mode):
