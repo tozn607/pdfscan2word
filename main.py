@@ -401,7 +401,7 @@ class PDFOCRApp(ctk.CTk):
             # Vòng lặp bây giờ sẽ chạy trên danh sách ảnh đã được xử lý
             for i, image in enumerate(processed_images):
                 if self.stop_event.is_set():
-                    self.write_log("  [-] Bỏ dở tài liệu này do lệnh Dừng.")
+                    self.write_log(f"  [-] Đã dừng. Đang đóng gói dữ liệu đã quét được của file {pdf_filename}...")
                     break
 
                 self.write_log(f"    [>] Đang đọc khối ảnh {i+1}/{len(processed_images)}...")
@@ -437,14 +437,22 @@ class PDFOCRApp(ctk.CTk):
                         else:
                             self.write_log(f"      [X] Bỏ qua trang {i+1}.")
 
-            if not self.stop_event.is_set():
+            # --- LƯU FILE (CHẠY KỂ CẢ KHI BỊ DỪNG) ---
+            if full_markdown_content.strip():
                 try:
                     pypandoc.convert_text(full_markdown_content, 'docx', format='md', outputfile=output_docx_path)
-                    self.write_log(f"  [***] Đã lưu Word: {output_docx_path}")
-                except:
+                    prefix = "[BẢN NHÁP]" if self.stop_event.is_set() else "[***]"
+                    self.write_log(f"  {prefix} Đã lưu kết quả tại: {output_docx_path}")
+                except Exception as e:
+                    # Nếu lỗi Docx, lưu tạm file Markdown để cứu dữ liệu
                     md_path = output_docx_path.replace('.docx', '.md')
-                    with open(md_path, 'w', encoding='utf-8') as f: f.write(full_markdown_content)
-                    self.write_log(f"  [+] Đã lưu Markdown tại: {md_path}")
+                    with open(md_path, 'w', encoding='utf-8') as f: 
+                        f.write(full_markdown_content)
+                    self.write_log(f"  [+] Đã cứu dữ liệu dưới dạng Markdown tại: {md_path}")
+            
+            # Nếu đang ở chế độ hàng loạt (nhiều file PDF) và bấm dừng, thì thoát luôn vòng lặp file lớn
+            if self.stop_event.is_set():
+                break
 
         if self.stop_event.is_set():
             self.write_log("\n[⏹] TIẾN TRÌNH ĐÃ BỊ HỦY BỞI NGƯỜI DÙNG.")
