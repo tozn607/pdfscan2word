@@ -140,8 +140,13 @@ class PDFOCRApp(ctk.CTk):
 
         # Checkbox mới: Lưu riêng trang bìa
         self.cover_var = ctk.BooleanVar(value=False)
-        self.chk_cover = ctk.CTkCheckBox(self.frame_options, text="🖼️ Lưu riêng trang bìa (Bỏ qua Scan trang 1)", variable=self.cover_var, font=("Arial", 12, "bold"))
-        self.chk_cover.pack(side="left", padx=15)
+        self.chk_cover = ctk.CTkCheckBox(self.frame_options, text="🖼️ Lưu riêng trang bìa", variable=self.cover_var, font=("Arial", 12, "bold"))
+        self.chk_cover.pack(side="left", padx=10)
+
+        # Checkbox mới: Gộp 2 trang
+        self.merge_pages_var = ctk.BooleanVar(value=False)
+        self.chk_merge_pages = ctk.CTkCheckBox(self.frame_options, text="📖 Gộp 2 trang làm 1 (Tăng tốc sách A5)", variable=self.merge_pages_var, font=("Arial", 12, "bold"))
+        self.chk_merge_pages.pack(side="left", padx=10)
 
         # --- 4. NÚT ĐIỀU KHIỂN ---
         self.frame_buttons = ctk.CTkFrame(self, fg_color="transparent")
@@ -353,17 +358,41 @@ class PDFOCRApp(ctk.CTk):
                 # Bắt đầu vòng lặp đọc chữ từ trang số 2 (index 1)
                 start_idx = 1 
 
+            # --- THUẬT TOÁN GỘP 2 TRANG THÀNH 1 SPREAD TĂNG TỐC ---
+            processed_images = []
+            if self.merge_pages_var.get():
+                self.write_log("  [*] Đang gộp cặp trang (trái-phải) để tăng tốc độ quét...")
+                for i in range(start_idx, len(images), 2):
+                    img_left = images[i]
+                    # Nếu còn trang tiếp theo để ghép thành cặp
+                    if i + 1 < len(images):
+                        img_right = images[i+1]
+                        # Tính toán kích thước canvas mới: Rộng = 2 ảnh cộng lại, Cao = ảnh cao nhất
+                        total_width = img_left.width + img_right.width
+                        max_height = max(img_left.height, img_right.height)
+                        
+                        # Tạo khung nền mới và dán 2 ảnh vào (trái, phải)
+                        new_img = Image.new('RGB', (total_width, max_height))
+                        new_img.paste(img_left, (0, 0))
+                        new_img.paste(img_right, (img_left.width, 0))
+                        processed_images.append(new_img)
+                    else:
+                        # Bị lẻ trang cuối cùng thì ném thẳng vào luôn
+                        processed_images.append(img_left)
+            else:
+                # Nếu không tick gộp, thì cứ để nguyên từng trang
+                processed_images = images[start_idx:]
+
             full_markdown_content = ""
             max_retries = 5 
 
-            # Thay vì dùng enumerate(images), dùng range để kiểm soát điểm bắt đầu
-            for i in range(start_idx, len(images)):
-                image = images[i]
+            # Vòng lặp bây giờ sẽ chạy trên danh sách ảnh đã được xử lý
+            for i, image in enumerate(processed_images):
                 if self.stop_event.is_set():
                     self.write_log("  [-] Bỏ dở tài liệu này do lệnh Dừng.")
                     break
 
-                self.write_log(f"    [>] Trang {i+1}/{len(images)}...")
+                self.write_log(f"    [>] Đang đọc khối ảnh {i+1}/{len(processed_images)}...")
                 
                 for attempt in range(max_retries):
                     if self.stop_event.is_set(): break
