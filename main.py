@@ -9,6 +9,7 @@ import docx
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from datetime import datetime
+import json
 
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
@@ -607,17 +608,24 @@ class PDFOCRApp(ctk.CTk):
             # Cập nhật mỗi giây một lần
             self.after(1000, self.update_timer_ui)
 
-    # --- TÍNH NĂNG KIỂM TRA CẬP NHẬT TỪ GITHUB ---
+    # --- TÍNH NĂNG KIỂM TRA CẬP NHẬT TỪ GITHUB API ---
     def check_for_updates(self):
-        """Hàm chạy ngầm kiểm tra version.txt từ GitHub"""
+        """Hàm chạy ngầm kiểm tra Release mới nhất từ GitHub API"""
         try:
-            req = urllib.request.Request(UPDATE_RAW_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            # Gửi yêu cầu lên GitHub API (GitHub yêu cầu phải có User-Agent)
+            req = urllib.request.Request(GITHUB_API_URL, headers={'User-Agent': 'PDFScan2Word-App'})
             with urllib.request.urlopen(req, timeout=5) as response:
-                latest_version = response.read().decode('utf-8').strip()
+                # Đọc dữ liệu JSON trả về
+                data = json.loads(response.read().decode('utf-8'))
+                
+                # Lấy tên của tag mới nhất (ví dụ: "v1.1.2")
+                latest_tag = data.get('tag_name', '')
+                
+                # Cắt bỏ chữ 'v' ở đầu để lấy con số thuần túy (thành "1.1.2")
+                latest_version = latest_tag.lstrip('v')
 
-            # Nếu phiên bản trên mạng lớn hơn phiên bản hiện tại
+            # So sánh phiên bản (Chuỗi text "1.1.2" > "1.1.1")
             if latest_version > CURRENT_VERSION:
-                # Gọi hàm hiển thị Popup thông qua UI thread chính
                 self.after(500, self.show_update_popup, latest_version)
         except Exception as e:
             print(f"[!] Không thể kiểm tra cập nhật: {e}")
