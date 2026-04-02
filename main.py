@@ -10,6 +10,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from datetime import datetime
 import json
+from PIL import Image, ImageEnhance
 
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
@@ -532,6 +533,20 @@ class PDFOCRApp(ctk.CTk):
         btn_clear = ctk.CTkButton(frame_controls, text="Xóa hết", width=80, fg_color="#a83232", hover_color="#7a2121", command=self.clear_images)
         btn_clear.pack(side="left", padx=5)
 
+        # --- TÙY CHỌN NÉN VÀ FILTER ---
+        self.compress_var = ctk.BooleanVar(value=True) # Mặc định bật nén
+        self.enhance_var = ctk.BooleanVar(value=False)
+        
+        frame_options = ctk.CTkFrame(self.merge_window, fg_color="transparent")
+        frame_options.pack(pady=(0, 5), padx=20, fill="x")
+        
+        chk_compress = ctk.CTkCheckBox(frame_options, text="🗜️ Nén giảm dung lượng", variable=self.compress_var)
+        chk_compress.pack(side="left", padx=5)
+        
+        chk_enhance = ctk.CTkCheckBox(frame_options, text="✨ Làm sáng & Rõ chữ (Filter)", variable=self.enhance_var)
+        chk_enhance.pack(side="left", padx=20)
+        # ------------------------------
+
         # Sử dụng Listbox của tkinter thay vì Textbox để có thể click chọn dòng
         list_frame = tk.Frame(self.merge_window, bg="#343638")
         list_frame.pack(pady=10, padx=20, fill="both", expand=True)
@@ -587,14 +602,52 @@ class PDFOCRApp(ctk.CTk):
     def export_to_pdf(self):
         if not self.selected_images_list: return
         save_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF", "*.pdf")])
+        
         if save_path:
+            self.img_listbox.delete(0, 'end')
+            self.img_listbox.insert('end', "Đang xử lý ảnh, vui lòng đợi...")
+            self.merge_window.update() # Ép giao diện cập nhật dòng chữ ngay lập tức
+            
             try:
-                # Pillow có thể mở HEIC nhờ pillow-heif đã register ở trên
-                imgs = [Image.open(p).convert('RGB') for p in self.selected_images_list]
-                imgs[0].save(save_path, save_all=True, append_images=imgs[1:])
+                processed_imgs = []
+                for p in self.selected_images_list:
+                    # Mở và chuyển đổi sang RGB
+                    img = Image.open(p).convert('RGB')
+                    
+                    # 1. FILTER LÀM RÕ CHỮ (Giống chức năng Scan tài liệu)
+                    if self.enhance_var.get():
+                        # Tăng độ tương phản lên 50% (làm nền trắng hơn, chữ đen hơn)
+                        enhancer_contrast = ImageEnhance.Contrast(img)
+                        img = enhancer_contrast.enhance(1.5)
+                        
+                        # Tăng độ sắc nét lên 100% (giúp nét chữ không bị mờ nhòe)
+                        enhancer_sharpness = ImageEnhance.Sharpness(img)
+                        img = enhancer_sharpness.enhance(2.0)
+                        
+                        # Tăng độ sáng nhẹ (10%) để khắc phục ảnh chụp thiếu sáng
+                        enhancer_brightness = ImageEnhance.Brightness(img)
+                        img = enhancer_brightness.enhance(1.1)
+
+                    # 2. NÉN ẢNH GIẢM DUNG LƯỢNG
+                    if self.compress_var.get():
+                        # Giới hạn chiều ngang tối đa của ảnh là 1200 pixel (chuẩn xem trên màn hình và in A4)
+                        max_width = 1200
+                        if img.width > max_width:
+                            # Tính toán tỷ lệ để bóp nhỏ ảnh mà không bị méo
+                            ratio = max_width / img.width
+                            new_size = (max_width, int(img.height * ratio))
+                            # Dùng thuật toán LANCZOS để giữ nguyên chất lượng cao nhất khi bóp nhỏ
+                            img = img.resize(new_size, Image.Resampling.LANCZOS)
+                            
+                    processed_imgs.append(img)
+                
+                # Lưu tất cả các ảnh đã qua xử lý vào chung 1 file PDF
+                processed_imgs[0].save(save_path, save_all=True, append_images=processed_imgs[1:])
+                
                 self.img_listbox.delete(0, 'end')
                 self.img_listbox.insert('end', f"--- THÀNH CÔNG ---")
                 self.img_listbox.insert('end', f"Đã lưu PDF: {save_path}")
+                
             except Exception as e: 
                 self.img_listbox.delete(0, 'end')
                 self.img_listbox.insert('end', f"[!] LỖI: {e}")
