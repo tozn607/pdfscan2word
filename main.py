@@ -32,6 +32,17 @@ CURRENT_VERSION = "1.2.0"
 UPDATE_RAW_URL = "https://raw.githubusercontent.com/tozn607/pdfscan2word/main/version.txt"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
+def get_build_date():
+    """Hàm tự động lấy ngày build dựa vào file thực thi của PyInstaller"""
+    if getattr(sys, 'frozen', False):
+        # Nếu đang chạy dạng app đã build, lấy ngày sinh ra file đó
+        try:
+            mtime = os.path.getmtime(sys.executable)
+            return datetime.fromtimestamp(mtime)
+        except: pass
+    # Nếu chạy script bình thường, lấy ngày hôm nay
+    return datetime.now()
+
 # Tự động tìm thư mục Home của máy tính và tạo folder ẩn .pdfscan2word
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".pdfscan2word")
 API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
@@ -174,24 +185,17 @@ class PDFOCRApp(ctk.CTk):
         # --- Khởi chạy luồng kiểm tra cập nhật ngầm ---
         threading.Thread(target=self.check_for_updates, daemon=True).start()
 
-        # --- 6. FOOTER (CHỮ KÝ & PHIÊN BẢN) ---
-        self.frame_footer = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_footer.pack(side="bottom", pady=(0, 10))
+        # --- 6. FOOTER (MỞ CỬA SỔ ABOUT MAC STYLE) ---
+        build_date = get_build_date()
+        self.build_str = build_date.strftime("%Y%m%d")
+        self.year_str = build_date.strftime("%Y")
 
-        today = datetime.now()
-        build_str = today.strftime("%Y%m%d")
-        year_str = today.strftime("%Y")
-
-        lbl_dev_prefix = ctk.CTkLabel(self.frame_footer, text="Developed by ", text_color="gray50", font=("Arial", 12))
-        lbl_dev_prefix.pack(side="left")
-
-        lbl_link = ctk.CTkLabel(self.frame_footer, text="@tozn607", text_color="#1f6aa5", font=("Arial", 12, "bold", "underline"), cursor="hand2")
-        lbl_link.pack(side="left")
-        # Gắn sự kiện: Bấm chuột trái (<Button-1>) sẽ mở trình duyệt tới link GitHub
-        lbl_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/tozn607"))
-
-        lbl_version_suffix = ctk.CTkLabel(self.frame_footer, text=f" | Version v{CURRENT_VERSION} Build {build_str} | © {year_str}", text_color="gray50", font=("Arial", 12))
-        lbl_version_suffix.pack(side="left")
+        footer_text = f"Developed by @tozn607 | Version v{CURRENT_VERSION} Build {self.build_str} | © {self.year_str}"
+        self.lbl_footer = ctk.CTkLabel(self, text=footer_text, text_color="gray50", font=("Arial", 12), cursor="hand2")
+        self.lbl_footer.pack(side="bottom", pady=(0, 10))
+        
+        # Gắn sự kiện: Bấm vào dòng này sẽ mở cửa sổ About
+        self.lbl_footer.bind("<Button-1>", self.show_about_popup)
 
     # --- HÀM THAY ĐỔI GIAO DIỆN THEO CHẾ ĐỘ ---
     def change_mode(self, selected_mode):
@@ -609,6 +613,36 @@ class PDFOCRApp(ctk.CTk):
         
         btn_no = ctk.CTkButton(btn_frame, text="Bỏ qua", fg_color="gray", hover_color="darkgray", command=dialog.destroy)
         btn_no.pack(side="left", padx=10)
+
+    def show_about_popup(self, event=None):
+        """Hiển thị cửa sổ About chuẩn phong cách macOS"""
+        about_window = ctk.CTkToplevel(self)
+        about_window.title("")
+        about_window.geometry("280x320")
+        about_window.resizable(False, False)
+        about_window.attributes("-topmost", True)
+        about_window.grab_set()
+
+        # Logo
+        lbl_logo = ctk.CTkLabel(about_window, text="📄", font=("Arial", 60))
+        lbl_logo.pack(pady=(20, 10))
+
+        # Tên ứng dụng
+        lbl_name = ctk.CTkLabel(about_window, text="Công cụ chuyển \n Ảnh sang Word", font=("Arial", 20, "bold"))
+        lbl_name.pack(pady=(0, 5))
+
+        # Phiên bản và Build
+        lbl_ver = ctk.CTkLabel(about_window, text=f"Phiên bản {CURRENT_VERSION} ({self.build_str})", font=("Arial", 12), text_color="gray50")
+        lbl_ver.pack(pady=(0, 15))
+
+        # Bản quyền
+        lbl_copyright = ctk.CTkLabel(about_window, text=f"Cảm ơn bạn hiền đã sử dụng ứng dụng này <3", font=("Arial", 12))
+        lbl_copyright.pack(pady=(0, 20))
+
+        # Nút Link Github
+        lbl_link = ctk.CTkLabel(about_window, text="Developed by @tozn607", text_color="#1f6aa5", font=("Arial", 12, "bold", "underline"), cursor="hand2")
+        lbl_link.pack(pady=(0, 20))
+        lbl_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/tozn607"))
 
 if __name__ == "__main__":
     app = PDFOCRApp()
