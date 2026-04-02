@@ -5,6 +5,9 @@ import sys
 import time
 import threading
 import tkinter as tk
+import docx
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from datetime import datetime
 
 # --- MACOS CRASH FIX ---
@@ -62,18 +65,20 @@ prompt_template = r"""
 Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
 Nhiệm vụ của bạn là trích xuất và phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
 1. ƯU TIÊN SỐ 1 - BẢO TOÀN DANH SÁCH: Mọi mục bắt đầu bằng số (1., 2.), chữ cái (A., a.) BẮT BUỘC nằm ở dòng riêng. 
-2. NGĂN TỰ ĐỘNG TẠO BULLET POINT (QUAN TRỌNG): 
-   - Trình biên dịch sẽ tự động biến dấu gạch ngang đầu dòng thành dấu chấm đen. Để ngăn chặn điều này: NẾU bản gốc có dấu gạch ngang (-) ở đầu dòng, BẮT BUỘC phải dùng dấu gạch chéo ngược để thoát (escape): Viết là `\- ` thay vì `- `.
-   - Vẫn giữ nguyên định dạng in nghiêng hoặc in đậm phía sau dấu gạch ngang nếu có (ví dụ: `\- *Chủ nghĩa duy vật lịch sử*`).
-   - Các mục đánh số (1., 2.) hoặc chữ cái (a., b.) thì giữ nguyên, KHÔNG được tự ý chèn thêm dấu gạch ngang vào trước chúng.
+2. NGĂN TỰ ĐỘNG TẠO BULLET POINT: 
+   - NẾU bản gốc có dấu gạch ngang (-) ở đầu dòng, BẮT BUỘC phải dùng dấu gạch chéo ngược để thoát (escape): Viết là `\- ` thay vì `- `.
+   - Các mục đánh số (1., 2.) hoặc chữ cái (a., b.) thì giữ nguyên, KHÔNG chèn thêm gạch ngang.
 3. NỐI DÒNG THÔNG MINH: Chỉ nối nếu dòng dưới là phần đứt đoạn của câu trên. 
-4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc. Tiêu đề lớn in đậm và đứng riêng.
+4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc.
 5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung để điền bù chữ khuất mép giấy. Xóa bỏ hoàn toàn ký tự rác.
 6. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang. Hãy chủ động bỏ qua chúng.
 7. XỬ LÝ CHÚ THÍCH (FOOTNOTE): NẾU trang tài liệu có chú thích ở dưới cùng:
    - Đặt mốc `[^1]`, `[^2]`... sát ngay sau từ/câu được chú thích.
    - Ghi nội dung chú thích ở tận cùng của văn bản theo cú pháp: `[^1]: Nội dung chú thích...`
 8. THỤT ĐẦU DÒNG (INDENTATION): Nếu đoạn văn trong bản gốc có lùi vào ở dòng đầu tiên, BẮT BUỘC chèn cụm ký tự `&emsp;&emsp;` vào ngay vị trí bắt đầu của đoạn văn đó. TUYỆT ĐỐI KHÔNG dùng phím Space hoặc Tab.
+9. BẢNG BIỂU (TABLES) - KHÔNG DÙNG HTML:
+   - BẮT BUỘC sử dụng cú pháp bảng Markdown tiêu chuẩn (dùng các dấu gạch đứng `|`). TUYỆT ĐỐI KHÔNG DÙNG mã HTML (`<table>`, `<tr>`...) vì trình biên dịch Word sẽ xóa mất định dạng.
+   - XỬ LÝ Ô GỘP (MERGED CELLS): Vì Markdown không thể gộp ô, NẾU bản gốc có ô gộp nhiều hàng (ví dụ: "Môn học bắt buộc" gộp 5 hàng), hãy điền nội dung vào hàng đầu tiên của nhóm đó. Các hàng bên dưới thuộc cùng nhóm thì ĐỂ TRỐNG (ví dụ: `| | Toán | 105 |`).
 Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
 """
 
@@ -444,7 +449,32 @@ class PDFOCRApp(ctk.CTk):
             # --- LƯU FILE (CHẠY KỂ CẢ KHI BỊ DỪNG) ---
             if full_markdown_content.strip():
                 try:
+                    # 1. Pandoc tạo ra file Word trần trụi
                     pypandoc.convert_text(full_markdown_content, 'docx', format='md', outputfile=output_docx_path)
+                    
+                    # 2. Can thiệp mã lõi XML để tự tay kẻ viền đen cho TẤT CẢ các bảng
+                    try:
+                        doc = docx.Document(output_docx_path)
+                        for table in doc.tables:
+                            tblPr = table._tbl.tblPr
+                            
+                            # Xây dựng mã XML cho khung viền (Tất cả các cạnh: trên, dưới, trái, phải, ngang trong, dọc trong)
+                            tblBorders = OxmlElement('w:tblBorders')
+                            for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+                                border = OxmlElement(f'w:{border_name}')
+                                border.set(qn('w:val'), 'single') # Viền nét đơn
+                                border.set(qn('w:sz'), '4')       # Độ dày 0.5pt
+                                border.set(qn('w:space'), '0')    # Khoảng cách
+                                border.set(qn('w:color'), '000000') # Mã màu đen tuyền
+                                tblBorders.append(border)
+                                
+                            # Gắn khung viền vào bảng
+                            tblPr.append(tblBorders)
+                            
+                        doc.save(output_docx_path)
+                    except Exception as e_docx:
+                        self.write_log(f"  [!] Lỗi khi kẻ viền XML: {e_docx}")
+
                     prefix = "[BẢN NHÁP]" if self.stop_event.is_set() else "[***]"
                     self.write_log(f"  {prefix} Đã lưu kết quả tại: {output_docx_path}")
                 except Exception as e:
