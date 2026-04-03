@@ -19,7 +19,8 @@ if sys.platform == "darwin":
 
 import customtkinter as ctk
 from tkinter import filedialog
-from pdf2image import convert_from_path
+import fitz 
+from PIL import Image, ImageEnhance
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pypandoc
@@ -359,7 +360,35 @@ class PDFOCRApp(ctk.CTk):
 
             self.write_log(f"\n[FILE {file_idx + 1}/{total_files}] Đang tách: {pdf_filename}...")
             
-            try: images = convert_from_path(pdf_path)
+            images = []
+            try: 
+                # --- AUTO-INSTALL PANDOC TỐI ƯU CHO APP ĐÓNG GÓI ---
+                # Khai báo trước đường dẫn Pandoc sẽ nằm ở thư mục ~/.pdfscan2word
+                pandoc_exe = os.path.join(CONFIG_DIR, "pandoc" + (".exe" if sys.platform == "win32" else ""))
+                
+                # Nếu file pandoc đã từng được tải về, ép pypandoc xài luôn file đó
+                if os.path.exists(pandoc_exe):
+                    os.environ['PYPANDOC_PANDOC'] = pandoc_exe
+
+                try:
+                    pypandoc.get_pandoc_version()
+                except OSError:
+                    self.write_log("  [*] Đang tải và thiết lập trình biên dịch Word (chỉ chạy 1 lần)...")
+                    # Ép tải file nén và giải nén thẳng vào thư mục ~/.pdfscan2word
+                    pypandoc.download_pandoc(targetfolder=CONFIG_DIR, download_folder=CONFIG_DIR)
+                    # Cập nhật lại đường dẫn cho hệ thống nhận diện
+                    os.environ['PYPANDOC_PANDOC'] = pandoc_exe
+
+                # --- ĐỌC PDF BẰNG PYMUPDF ---
+                doc = fitz.open(pdf_path)
+                for page in doc:
+                    # Chụp ảnh trang PDF ở độ phân giải cao (tương đương 200-300 dpi)
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                    
+                    # Chuyển đổi dữ liệu ảnh của Fitz sang chuẩn của Pillow (PIL)
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    images.append(img)
+                    
             except Exception as e:
                 self.write_log(f"  [X] LỖI ĐỌC PDF: {e}")
                 continue 
