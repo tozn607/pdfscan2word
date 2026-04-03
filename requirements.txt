@@ -2,8 +2,9 @@
 # WINDOWS: Download Pandoc.msi from their website
 
 customtkinter
-pdf2image
+PyMuPDF
 google-generativeai
 pypandoc
 Pillow
 pillow-heif
+python-docx

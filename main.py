@@ -34,7 +34,7 @@ except ImportError:
 
 # --- CẤU HÌNH PHIÊN BẢN VÀ CẬP NHẬT ---
 CURRENT_VERSION = "1.3.1"
-UPDATE_RAW_URL = "https://raw.githubusercontent.com/tozn607/pdfscan2word/main/version.txt"
+GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
 def get_build_date():
