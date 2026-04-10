@@ -1,93 +1,119 @@
-# 📄 PDF to Word OCR
+<div align="center">
 
-Một ứng dụng Desktop mạnh mẽ giúp chuyển đổi các tài liệu PDF dạng scan hoặc hình ảnh sang định dạng Word (.docx) mà vẫn **giữ nguyên cấu trúc định dạng gốc** (bảng biểu, in đậm, in nghiêng, danh sách). 
+# 📄 PDFScan2Word (v2.0.0)
 
-Khác với các công cụ OCR truyền thống (như Tesseract) thường làm mất định dạng và nối dòng lộn xộn, phần mềm này ứng dụng mô hình AI Đa phương thức (Google Gemini 3.1 Flash) để "đọc hiểu" ngữ cảnh trang giấy, khôi phục cấu trúc và xuất ra file Word hoàn chỉnh.
+**[🇺🇸 English](#-english) • [🇻🇳 Tiếng Việt](#-tiếng-việt)**
 
-## ✨ Tính năng nổi bật
-- **Bảo toàn định dạng (Formatting):** Nhận diện chính xác và giữ nguyên các gạch đầu dòng, danh sách đánh số, đoạn văn bản in đậm/in nghiêng và bảng biểu.
-- **Phục hồi văn bản thông minh:** AI tự động suy luận và điền bù các chữ bị khuất ở mép gáy sách — cực kỳ hữu ích khi số hóa các giáo trình đại học dày đặc, tài liệu luật pháp, hoặc các văn bản triết học.
-- **Xử lý hàng loạt (Batch Processing):** Quét toàn bộ một thư mục chứa hàng chục file PDF và tự động xuất ra file Word tương ứng chỉ với 1 cú click.
-- **Tiện ích gộp ảnh:** Tích hợp sẵn công cụ chọn nhiều file ảnh (.jpg, .png) và đóng gói thành 1 file PDF duy nhất.
-- **Tự động cập nhật (Auto-update):** Thông báo ngay trên giao diện khi có phiên bản mới nhất từ GitHub.
+![GitHub release](https://img.shields.io/github/v/release/tozn607/pdfscan2word?color=success)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![AI](https://img.shields.io/badge/AI-Google_Gemini_3.1-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## 📸 Ảnh chụp màn hình
+A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into fully formatted Word (`.docx`) documents.  
+*Một ứng dụng Desktop sức mạnh AI giúp số hóa PDF & Ảnh quét thành tài liệu Word (.docx) giữ nguyên định dạng.*
 
-![Giao diện chính](readme/1.png)
-*Giao diện làm việc với chế độ Đơn và Hàng loạt*
+<img src="readme/1.png" alt="Main Interface" width="700"/>
 
-![Tiện ích gộp ảnh](readme/2.png)
-*Tiện ích gộp ảnh thành PDF*
+*(Note: Screenshots are located in the `readme/` folder. Feel free to update them to feature the new v2.0 UI!)*
 
-## ⚙️ Yêu cầu hệ thống (Prerequisites)
-Để chạy từ mã nguồn (Source code), máy tính của bạn cần cài đặt:
-1. **Python 3.8** trở lên.
-2. **Poppler**: Công cụ lõi dùng để chuyển PDF thành ảnh (pdf2image).
-3. **Pandoc**: Công cụ lõi dùng để dịch Markdown sang Word (.docx).
+</div>
 
-## 🚀 Hướng dẫn Cài đặt
+---
 
-### Bước 1: Tải mã nguồn
+## 🇺🇸 English
+
+### 🚀 What's New in v2.0.0?
+This major update brings a complete overhaul to the application:
+- **No System Dependencies Required:** We completely replaced `pdf2image` with `PyMuPDF`, meaning **Poppler is no longer required**! Pandoc is also automatically fetched if not detected.
+- **Modernized UI:** A brand new, sleek, card-based interface with native Dark Mode support and responsive design.
+- **Bilingual Support:** Full English & Vietnamese UI, featuring a first-time setup language selector.
+- **AI Exercise Solver:** A brand new option that automatically detects exercises in the scan and appends fully mathematical/worked-out solutions!
+- **Cross-Platform Pre-built Binaries:** Automatically built via GitHub Actions. Now available natively for Windows, macOS (Apple Silicon M1/M2/M3), and macOS (Intel).
+
+### ✨ Key Features
+- **Format Preservation:** Maintains bullet points, numbered lists, bold/italic text, and tables natively in Word using PyPandoc.
+- **Smart Text Recovery:** Uses Google's Gemini 3.1 Flash to infer and fill in text cut-off at the page edges—perfect for thick university textbooks or legal docs.
+- **Batch Processing:** Convert entire folders of PDFs with a single click.
+- **Image to PDF Maker:** Includes a built-in utility to merge, compress, and enhance `.heic`, `.jpg`, `.png` into a single PDF.
+- **Left-Right Page Splitting:** Scans 2 pages (like an A5 book spread) at once to speed up processing.
+
+### ⚙️ Quick Installation (Recommended)
+You don't need to know Python to use this app. Just download the pre-built application:
+
+1. Go to the [Releases](https://github.com/tozn607/pdfscan2word/releases) page.
+2. Download the version for your OS:
+   - **Windows:** Download the `.exe` or `.zip` for Windows.
+   - **macOS:** Download the `.zip` for `Apple Silicon (arm64)` or `Intel (x86_64)`.
+3. Extract and run!
+> **🍎 macOS Quarantine Note:** If macOS prevents the app from opening by saying "app is damaged", open Terminal and run: `xattr -cr /path/to/extracted/PDFScan2Word.app`
+
+### 💻 Running from Source
+If you are a developer and want to run it from the code:
 ```bash
 git clone https://github.com/tozn607/pdfscan2word.git
 cd pdfscan2word
-```
-
-### Bước 2: Cài đặt thư viện Python
-```bash
 pip install -r requirements.txt
+python main.py
 ```
 
-### Bước 3: Cài đặt công cụ hệ thống (Quan trọng)
+### 💡 How to Use
+1. Get a free API Key from [Google AI Studio](https://aistudio.google.com/).
+2. Open the app, select your preferred language (English).
+3. Paste the API Key in the field.
+4. Select "Single Mode" (1 file) or "Batch Mode" (folder).
+5. Add your inputs and click **START PROCESSING**. It will auto-save the `.docx` file!
 
-**🍎 Dành cho macOS:**
-Bạn có thể dễ dàng cài đặt Poppler và Pandoc qua Homebrew:
+---
+
+## 🇻🇳 Tiếng Việt
+
+### 🚀 Có gì mới trong bản v2.0.0?
+Phiên bản này mang đến đợt nâng cấp toàn diện nhất từ trước tới nay:
+- **Không Cần Cài Thư Viện Hệ Thống:** Loại bỏ hoàn toàn sự phụ thuộc vào Poppler nhờ chuyển sang dùng `PyMuPDF`. Pandoc cũng được tự động tải về. Người dùng không cực nhọc cài đặt nữa!
+- **Giao Diện Hiện Đại:** Lột xác hoàn toàn với giao diện thẻ (card-based), phông chữ to rõ trang nhã và Native Dark Mode.
+- **Đa Ngôn Ngữ:** Hỗ trợ song ngữ Anh/Việt từ đầu tới cuối ứng dụng.
+- **AI Giải Bài Tập:** Tính năng mới cho phép AI tự động nhận diện bài tập trong sách và làm bài giải chi tiết đính kèm cuối file Word!
+- **Đóng Gói Đa Nền Tảng:** Hỗ trợ file chạy trực tiếp không cần cài Python trên Windows, macOS (Apple Silicon M1/M2/M3) và macOS (Intel).
+
+### ✨ Tính năng Nổi bật
+- **Bảo toàn Định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách list, in đậm/nghiêng trực tiếp.
+- **Phục hồi Văn bản:** Có khả năng điền bù chữ bị tối hoặc gấp nếp sát mép gáy quyển giáo trình thật.
+- **Xử lý Hàng loạt:** Quét hàng chục file PDF trong thư mục cùng lúc.
+- **Gộp & Tối ưu Ảnh:** Tiện ích nhỏ giúp bạn ghép các file hình rời rạc (.heic, .jpg) thành 1 file PDF để chuẩn bị xử lý.
+- **Xử lý Trang Đôi:** Nhận diện sách A5 được scan với 2 trang mỗi khung hình.
+
+### ⚙️ Cài đặt Siêu Dễ (Khuyên dùng)
+Bạn không cần biết code để xài, chỉ cần tải về nhấp đúp là chạy:
+
+1. Tới trang [Releases](https://github.com/tozn607/pdfscan2word/releases).
+2. Tải phiên bản phù hợp với hệ điều hành:
+   - **Lưu ý Windows:** Tải file `.exe` hoạt động dạng Portable hoặc giải nén file `.zip`.
+   - **Lưu ý macOS:** Tải bản `.zip` cho tương ứng dòng máy Apple Silicon (arm64) hoặc chip Intel (x86_64).
+3. Giải nén và tận hưởng!
+> **🍎 Khắc phục lỗi macOS:** Với lần đầu, nếu hệ thống báo "Ứng dụng bị hỏng (App is damaged)", hãy mở ứng dụng Terminal và gõ: `xattr -cr /đường-dẫn-tới/PDFScan2Word.app`
+
+### 💻 Chạy trên Môi trường Python (Source)
 ```bash
-brew install poppler pandoc
+git clone https://github.com/tozn607/pdfscan2word.git
+cd pdfscan2word
+pip install -r requirements.txt
+python main.py
 ```
 
-**🪟 Dành cho Windows:**
-1. **Poppler:** - Tải bản Release mới nhất của Poppler cho Windows tại [Release page](https://github.com/oschwartz10612/poppler-windows/releases/).
-   - Giải nén vào ổ C (Ví dụ: `C:\poppler`).
-   - Thêm đường dẫn thư mục `bin` (Ví dụ: `C:\poppler\Library\bin`) vào biến môi trường **PATH** của Windows.
-2. **Pandoc:**
-   - Tải file `.msi` cài đặt từ [trang chủ Pandoc](https://pandoc.org/installing.html) và tiến hành cài đặt bình thường.
+### 💡 Hướng dẫn Sử dụng Thao tác
+1. Tạo một API Key miễn phí từ [Google AI Studio](https://aistudio.google.com/).
+2. Mở ứng dụng lên, cài đặt ngôn ngữ ban đầu là Tiếng Việt.
+3. Dán API key vào mục yêu cầu (Key sẽ tự lưu cho các lần sau).
+4. Chọn chế độ **1 File PDF** hoặc **Thư Mục Hàng Loạt**.
+5. Chọn đường dẫn file và bấm **BẮT ĐẦU XỬ LÝ**. Thưởng thức thành quả lưu ở đầu ra `.docx`.
 
-## 💡 Hướng dẫn Sử dụng
-1. Khởi chạy ứng dụng:
-   ```bash
-   python bot_gui.py
-   ```
-2. Lấy API Key miễn phí từ [Google AI Studio](https://aistudio.google.com/) và dán vào ô **Google API Key**. Phần mềm sẽ tự động lưu lại key này cho những lần mở sau.
-3. Chọn chế độ làm việc: **Đơn (1 file)** hoặc **Hàng loạt (Thư mục)**.
-4. Chọn đường dẫn Input và Output. Nếu để trống Output, file Word sẽ được lưu cùng vị trí với thư mục gốc của bạn.
-5. Bấm **Bắt đầu xử lý** và theo dõi tiến trình trực tiếp trên màn hình Log.
+---
 
-## 📦 Hướng dẫn Build (Đóng gói thành App)
-Nếu bạn muốn đóng gói mã nguồn thành một file thực thi duy nhất (`.app` cho Mac hoặc `.exe` cho Windows) để mang đi máy khác chạy không cần cài Python:
+### ❤️ Credits
+- Cốt lõi giao diện: [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
+- Hệ thần kinh số: [Google Generative AI (Gemini)](https://ai.google.dev/)
+- Xử lý biên dịch Format: [Pandoc](https://pandoc.org/)
+- Nền tảng PDF: [PyMuPDF](https://pymupdf.readthedocs.io/)
 
-1. Cài đặt thư viện đóng gói:
-   ```bash
-   pip install pyinstaller
-   ```
-
-2. Chạy lệnh Build:
-   ```bash
-   pyinstaller --noconsole --windowed --onefile --collect-all customtkinter --name PDFScan2Word main.py
-   ```
-
-   
-3. Lấy file thành phẩm trong thư mục `dist/`.
-
-> **Lưu ý trên Windows:** File `.exe` sau khi build vẫn yêu cầu máy tính chạy nó phải có sẵn **Poppler** và **Pandoc** trong hệ thống để hoạt động bình thường.
-
-## 🤝 Đóng góp (Contributing)
-Mọi đóng góp để cải thiện ứng dụng đều được hoan nghênh! Vui lòng tạo *Pull Request* hoặc mở *Issue* để báo lỗi hoặc đề xuất tính năng.
-
-## 📜 Giấy phép (License)
-Dự án này được phân phối dưới giấy phép MIT License.
-
-## ❤️ Credits
-- Giao diện được xây dựng bằng [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter).
-- Lõi nhận diện AI sử dụng [Google Generative AI (Gemini)](https://ai.google.dev/).
-- Lõi chuyển đổi văn bản được xử lý bởi [Pandoc](https://pandoc.org/).
+### 📜 Giấy phép (License)
+Dự án open-source hoàn toàn 100% dưới giấy phép [MIT License](LICENSE).
