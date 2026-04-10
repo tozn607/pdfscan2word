@@ -1,4 +1,4 @@
-name: Build Windows EXE & Upload to Release
+name: Build and Upload to Release
 
 on:
   release:
@@ -7,7 +7,18 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            suffix: Windows
+          - os: macos-13
+            suffix: macOS-x86_64
+          - os: macos-14
+            suffix: macOS-arm64
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
     
     permissions:
       contents: write
@@ -34,29 +45,35 @@ jobs:
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
       shell: bash
 
-    - name: Đóng gói thành file EXE bằng PyInstaller
+    - name: Đóng gói thành file chạy bằng PyInstaller
       run: |
         pyinstaller --noconsole --windowed --onefile --collect-all customtkinter --name PDFScan2Word main.py
-
-    - name: Nén file EXE thành ZIP
+        
+    - name: Nén thành ZIP (Windows)
+      if: runner.os == 'Windows'
       run: |
-        Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+        Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
       shell: powershell
+
+    - name: Nén thành ZIP (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cd dist
+        zip -r ../PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip PDFScan2Word.app
+      shell: bash
 
     - name: Lưu file ZIP vào Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: PDFScan2Word-v${{ env.APP_VERSION }}-Windows
-        path: PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip
+        name: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}
+        path: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
         
-    - name: Đính kèm file ZIP Windows vào bài Release mới nhất
+    - name: Đính kèm file ZIP vào bài Release mới nhất
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Dùng GitHub CLI để hỏi xem cái tag của bài Release gần nhất tên là gì
         LATEST_TAG=$(gh release view --json tagName -q .tagName)
         echo "Đang upload vào Release: $LATEST_TAG"
         
-        # Đẩy file ZIP lên bài Release đó (cờ --clobber giúp ghi đè nếu file đã tồn tại)
-        gh release upload $LATEST_TAG PDFScan2Word-v${{ env.APP_VERSION }}-Windows.zip --clobber
+        gh release upload $LATEST_TAG PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip --clobber
       shell: bash
