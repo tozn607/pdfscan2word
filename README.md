@@ -14,8 +14,6 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 
 <img src="readme/1.png" alt="Main Interface" width="700"/>
 
-*(Note: Screenshots are located in the `readme/` folder. Feel free to update them to feature the new v2.0 UI!)*
-
 </div>
 
 ---
