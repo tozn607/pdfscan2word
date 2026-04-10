@@ -45,9 +45,15 @@ jobs:
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
       shell: bash
 
-    - name: Đóng gói thành file chạy bằng PyInstaller
+    - name: Đóng gói thành file chạy bằng PyInstaller (Windows)
+      if: runner.os == 'Windows'
       run: |
-        pyinstaller --noconsole --windowed --onefile --collect-all customtkinter --name PDFScan2Word main.py
+        pyinstaller --noconsole --onefile --name PDFScan2Word main.py
+        
+    - name: Đóng gói thành file chạy bằng PyInstaller (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        pyinstaller --noconsole --windowed --name PDFScan2Word main.py
         
     - name: Nén thành ZIP (Windows)
       if: runner.os == 'Windows'

@@ -15,10 +15,9 @@ os.system("rm -rf build dist PDFScan2Word.spec")
 
 # 3. Chạy lệnh PyInstaller
 subprocess.run([
-    "pyinstaller", 
+    "./.venv/bin/pyinstaller", 
     "--noconsole", 
     "--windowed", 
-    "--collect-all", "customtkinter", 
     "--name", "PDFScan2Word", 
     "main.py"
 ])

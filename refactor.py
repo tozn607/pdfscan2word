@@ -1,248 +1,20 @@
+import re
 import os
-import urllib.request
-import webbrowser
-import sys
-import time
-import threading
-import docx
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
-from docx.shared import Pt, Cm
-from datetime import datetime
-import json
-from PIL import Image, ImageEnhance
 
-# --- MACOS CRASH FIX ---
-if sys.platform == "darwin":
-    os.environ["PATH"] += os.pathsep + "/usr/local/bin" + os.pathsep + "/opt/homebrew/bin"
-# --------------------------------------------------------
+with open("main.py", "r", encoding="utf-8") as f:
+    orig = f.read()
 
-import fitz 
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-import pypandoc
+constants_end = orig.find("class LanguageSelectorPopup")
+constants_part = orig[:constants_end]
 
-try:
-    import pillow_heif
-    pillow_heif.register_heif_opener()
-except ImportError:
-    print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
+# remove customtkinter and darkdetect imports if any
+constants_part = re.sub(r'import customtkinter as ctk\n', '', constants_part)
+constants_part = re.sub(r'ctk\.set_appearance_mode\(.*?\)\n', '', constants_part)
+constants_part = re.sub(r'ctk\.set_default_color_theme\(.*?\)\n', '', constants_part)
+constants_part = re.sub(r'from tkinter import filedialog\n', '', constants_part)
+constants_part = re.sub(r'import tkinter as tk\n', '', constants_part)
 
-CURRENT_VERSION = "2.0.0"
-GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
-RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
-
-def get_build_date():
-    if getattr(sys, 'frozen', False):
-        try:
-            mtime = os.path.getmtime(sys.executable)
-            return datetime.fromtimestamp(mtime)
-        except: pass
-    return datetime.now()
-
-CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".pdfscan2word")
-API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
-CONFIG_JSON_FILE = os.path.join(CONFIG_DIR, "config.json")
-
-
-safety_config = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
-
-PROMPT_VN = r"""
-Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
-Nhiệm vụ của bạn là trích xuất và phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
-1. CƠ CHẾ XUỐNG DÒNG: 
-   - BẮT BUỘC chèn MỘT DÒNG TRẮNG (Enter 2 lần) giữa các đoạn văn, tiêu đề, mục danh sách để tránh bị dồn chữ.
-   - Chỉ nối dòng nếu dòng dưới là câu đứt đoạn của dòng trên.
-2. ĐẶC BIỆT XỬ LÝ MỤC LỤC (QUAN TRỌNG): 
-   - Vẫn giữ nguyên một dòng trắng (Enter 2 lần) giữa các mục.
-   - BẮT BUỘC khôi phục sự Thụt lề (Indentation) bằng cách chèn `&emsp;` vào đầu dòng (Mục lớn không thụt, Cấp 1 thụt 1 `&emsp;`, Cấp 2 thụt 2 `&emsp;`...).
-   - TUYỆT ĐỐI KHÔNG GÕ dải dấu chấm (`......`) nối giữa tên mục và số trang. 
-   - BẮT BUỘC phải thay thế toàn bộ dải dấu chấm đó bằng MỘT KÝ TỰ TAB DUY NHẤT với mã HTML là `&#9;`. 
-   - Cú pháp chuẩn: `&emsp;1.1. Các phong cách học tập&#9;4`
-3. NGĂN TỰ ĐỘNG TẠO BULLET POINT: 
-   - NẾU bản gốc có dấu gạch ngang (-) ở đầu dòng, BẮT BUỘC phải dùng dấu gạch chéo ngược để thoát (escape): Viết là `\- ` thay vì `- `.
-   - Các mục đánh số (1., 2.) hoặc chữ cái (a., b.) thì giữ nguyên, KHÔNG chèn thêm gạch ngang.
-4. ĐỊNH DẠNG: **In đậm** và *In nghiêng* đúng bản gốc.
-5. ĐIỀN CHỮ THIẾU: Dựa vào ngữ cảnh chung để điền bù chữ khuất mép giấy. Xóa bỏ hoàn toàn ký tự rác.
-6. LOẠI BỎ SỐ TRANG: TUYỆT ĐỐI KHÔNG ghi lại số trang ở lề trên/dưới cùng của trang.
-7. XỬ LÝ CHÚ THÍCH (FOOTNOTE):
-   - Đặt mốc `[^1]`, `[^2]`... sát ngay sau từ/câu được chú thích.
-   - Ghi nội dung chú thích ở tận cùng của văn bản theo cú pháp: `[^1]: Nội dung chú thích...`
-8. THỤT ĐẦU DÒNG ĐOẠN VĂN: Nếu đoạn văn trong bản gốc có lùi vào ở dòng đầu tiên, chèn `&emsp;&emsp;` vào đầu đoạn.
-9. BẢNG BIỂU (TABLES) - KHÔNG DÙNG HTML:
-   - BẮT BUỘC sử dụng cú pháp bảng Markdown tiêu chuẩn (dùng các dấu gạch đứng `|`). TUYỆT ĐỐI KHÔNG DÙNG mã HTML.
-   - XỬ LÝ Ô GỘP (MERGED CELLS): Điền nội dung vào hàng đầu tiên của nhóm ô gộp. Các hàng bên dưới thuộc cùng nhóm thì ĐỂ TRỐNG (ví dụ: `| | Toán | 105 |`).
-Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
-"""
-
-PROMPT_EN = r"""
-You are a professional document digitization and restoration expert. Here is a scanned image of a document/textbook page. 
-Your task is to extract, restore, and clean the text following these STRICT rules:
-1. LINE BREAK MECHANISM: 
-   - YOU MUST insert ONE BLANK LINE (Enter twice) between paragraphs, headings, and lists to prevent clumping.
-   - Only join lines if the bottom line is a continuation of a broken sentence.
-2. TABLE OF CONTENTS (CRUCIAL): 
-   - Keep one blank line between items.
-   - YOU MUST restore Indentation by inserting `&emsp;` at the beginning of the line.
-   - ABSOLUTELY DO NOT type a dot strip (`......`) connecting the section name and page number.
-   - YOU MUST replace the entire dot strip with a SINGLE TAB character using the HTML code `&#9;`. 
-   - Standard syntax: `&emsp;1.1. Learning styles&#9;4`
-3. PREVENT AUTO BULLET POINTS: 
-   - If the original has a dash (-) at the start of a line, YOU MUST escape it: Write `\- ` instead of `- `.
-   - Numbered (1., 2.) or lettered (a., b.) items remain unchanged, DO NOT insert dashes.
-4. FORMATTING: Preserve **Bold** and *Italics* exactly as the original.
-5. FILL MISSING TEXT: Use context to fill in text cut off at the edges. Remove all garbage characters.
-6. REMOVE PAGE NUMBERS: ABSOLUTELY DO NOT transcribe page numbers at the top/bottom margins.
-7. FOOTNOTES:
-   - Place markers `[^1]`, `[^2]`... immediately after the annotated word/sentence.
-   - Write the footnote content at the very end of the text using the syntax: `[^1]: Footnote content...`
-8. PARAGRAPH INDENTATION: If a paragraph is indented on the first line in the original, insert `&emsp;&emsp;` at the beginning.
-9. TABLES - NO HTML:
-   - YOU MUST use standard Markdown table syntax (using vertical pipes `|`). ABSOLUTELY NO HTML code.
-   - MERGED CELLS: Fill the content in the first row of the merged group. Leave the rows below in the same group BLANK (e.g., `| | Math | 105 |`).
-Only return the text in Markdown, provide no additional explanations.
-"""
-
-STRINGS = {
-    "VN": {
-        "title": "Chuyển Ảnh sang Word",
-        "toolbar": "Thanh công cụ:",
-        "lang_switch": "🌐 Ngôn ngữ",
-        "merge_pdf": "🖼️ GỘP ẢNH THÀNH PDF",
-        "mode_single": "Chế độ Đơn (1 File PDF)",
-        "mode_batch": "Chế độ Hàng loạt (Thư mục)",
-        "api_key": "Google API Key:",
-        "load_api": "Tải từ file .txt",
-        "api_placeholder": "Nhập API Key...",
-        "select_pdf": "Chọn File PDF",
-        "input_pdf_ph": "Đường dẫn đến 1 file PDF...",
-        "input_dir_btn": "Thư mục Input",
-        "input_dir_ph": "Thư mục chứa nhiều file PDF...",
-        "output_dir": "Thư mục Output",
-        "output_ph": "Trống = Tự động lưu cùng nơi với Input",
-        "solve_opt": "🤖 AI Giải bài tập",
-        "cover_opt": "🖼️ Lưu riêng trang bìa",
-        "merge_opt": "📖 Gộp 2 trang làm 1 (Sách A5)",
-        "start": "▶ BẮT ĐẦU XỬ LÝ",
-        "stop": "⏹ DỪNG LẠI",
-        "timer": "Thời gian xử lý: {0:02d}:{1:02d}",
-        "timer_init": "Thời gian: 00:00",
-        "log_ready": "[*] Ứng dụng đã sẵn sàng. Hãy chọn file/thư mục để bắt đầu.",
-        "log_stop_cmd": "\n[!] NHẬN LỆNH DỪNG... Đang hủy bỏ (Vui lòng đợi 1-2 giây).",
-        "err_api": "[!] LỖI: Vui lòng nhập API Key.",
-        "err_input": "[!] LỖI: Đường dẫn Input không tồn tại.",
-        "err_output": "[!] LỖI: Thư mục Output không tồn tại.",
-        "msg_auto_out": "[*] Không chọn Output, tự động lưu cùng thư mục Input: {0}",
-        "log_no_pdf": "\n[!] Không tìm thấy file PDF nào để xử lý!",
-        "log_start_batch": "\n[>>>] BẮT ĐẦU: Sẽ xử lý {0} file PDF.",
-        "log_split": "\n[FILE {0}/{1}] Đang tách: {2}...",
-        "log_pandoc": "  [*] Đang tải trình biên dịch Word (chỉ chạy 1 lần)...",
-        "log_err_read": "  [X] LỖI ĐỌC PDF: {0}",
-        "log_save_cover": "  [+] Đã lưu ảnh bìa: {0}",
-        "log_err_cover": "  [!] Lỗi khi lưu ảnh bìa: {0}",
-        "log_merge_pages": "  [*] Đang gộp cặp trang (trái-phải) để tăng tốc độ quét...",
-        "log_read_block": "    [>] Đang đọc khối ảnh {0}/{1}...",
-        "log_reject": "      [!] LỖI BẢN QUYỀN: Google từ chối đọc trang {0}.",
-        "log_err_attempt": "      [!] Lỗi (Thử {0}/{1}): {2}",
-        "log_skip": "      [X] Bỏ qua trang {0}.",
-        "log_format_err": "  [!] Lỗi khi định dạng file Word: {0}",
-        "log_save_draft": "  [BẢN NHÁP] Đã lưu kết quả tại: {0}",
-        "log_save_ok": "  [***] Đã lưu kết quả tại: {0}",
-        "log_rescue": "  [+] Đã cứu dữ liệu dưới dạng Markdown tại: {0}",
-        "log_cancel": "\n[⏹] TIẾN TRÌNH ĐÃ BỊ HỦY BỞI NGƯỜI DÙNG.",
-        "log_done": "\n[✓] ĐÃ HOÀN TẤT!",
-        "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
-        "merge_title": "Tiện ích: Gộp ảnh thành PDF",
-        "add_img": "Thêm ảnh",
-        "up": "▲ Lên",
-        "down": "▼ Xuống",
-        "clear": "Xóa hết",
-        "compress": "🗜️ Nén giảm dung lượng",
-        "enhance": "✨ Làm sáng & Rõ chữ",
-        "export_pdf": "XUẤT RA PDF",
-        "exporting": "Đang xử lý ảnh, vui lòng đợi...",
-        "merge_success": "--- THÀNH CÔNG ---\nĐã lưu PDF: {0}",
-        "merge_err": "[!] LỖI: {0}",
-        "update_title": "Thông báo Cập nhật",
-        "update_msg": "Có phiên bản mới: v{0}\nPhiên bản hiện tại: v{1}\n\nBạn có muốn tải bản cập nhật về không?",
-        "btn_yes": "Tải ngay",
-        "btn_no": "Bỏ qua",
-        "prompt_solve_ext": "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó."
-    },
-    "EN": {
-        "title": "Image to Word Converter",
-        "toolbar": "Toolbar:",
-        "lang_switch": "🌐 Language",
-        "merge_pdf": "🖼️ MERGE IMAGES TO PDF",
-        "mode_single": "Single Mode (1 PDF file)",
-        "mode_batch": "Batch Mode (Folder)",
-        "api_key": "Google API Key:",
-        "load_api": "Load from .txt",
-        "api_placeholder": "Enter API Key...",
-        "select_pdf": "Select PDF",
-        "input_pdf_ph": "Path to a single PDF file...",
-        "input_dir_btn": "Input Folder",
-        "input_dir_ph": "Folder containing multiple PDFs...",
-        "output_dir": "Output Folder",
-        "output_ph": "Empty = Auto save next to Input",
-        "solve_opt": "🤖 AI Solves Exercises",
-        "cover_opt": "🖼️ Save cover separately",
-        "merge_opt": "📖 Merge 2 pages (A5 books)",
-        "start": "▶ START PROCESSING",
-        "stop": "⏹ STOP",
-        "timer": "Processing time: {0:02d}:{1:02d}",
-        "timer_init": "Time: 00:00",
-        "log_ready": "[*] Application ready. Please select a file/folder to start.",
-        "log_stop_cmd": "\n[!] STOP COMMAND RECEIVED... Canceling tasks (Please wait 1-2s).",
-        "err_api": "[!] ERROR: Please enter API Key.",
-        "err_input": "[!] ERROR: Input path does not exist.",
-        "err_output": "[!] ERROR: Output folder does not exist.",
-        "msg_auto_out": "[*] Output not selected, auto saving to Input folder: {0}",
-        "log_no_pdf": "\n[!] No PDF files found to process!",
-        "log_start_batch": "\n[>>>] START: Will process {0} PDF files.",
-        "log_split": "\n[FILE {0}/{1}] Extracting: {2}...",
-        "log_pandoc": "  [*] Downloading Word compiler (runs only once)...",
-        "log_err_read": "  [X] PDF READ ERROR: {0}",
-        "log_save_cover": "  [+] Saved cover image: {0}",
-        "log_err_cover": "  [!] Error saving cover: {0}",
-        "log_merge_pages": "  [*] Merging page pairs (left-right) to speed up scanning...",
-        "log_read_block": "    [>] Reading image block {0}/{1}...",
-        "log_reject": "      [!] COPYRIGHT ERROR: Google refused to read page {0}.",
-        "log_err_attempt": "      [!] Error (Attempt {0}/{1}): {2}",
-        "log_skip": "      [X] Skipping page {0}.",
-        "log_format_err": "  [!] Error formatting Word file: {0}",
-        "log_save_draft": "  [DRAFT] Result saved at: {0}",
-        "log_save_ok": "  [***] Result saved at: {0}",
-        "log_rescue": "  [+] Rescued data as Markdown at: {0}",
-        "log_cancel": "\n[⏹] PROCESS CANCELLED BY USER.",
-        "log_done": "\n[✓] COMPLETED!",
-        "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
-        "merge_title": "Utility: Merge Images to PDF",
-        "add_img": "Add Images",
-        "up": "▲ Up",
-        "down": "▼ Down",
-        "clear": "Clear All",
-        "compress": "🗜️ Compress size",
-        "enhance": "✨ Enhance & Brighten",
-        "export_pdf": "EXPORT TO PDF",
-        "exporting": "Processing images, please wait...",
-        "merge_success": "--- SUCCESS ---\nSaved PDF: {0}",
-        "merge_err": "[!] ERROR: {0}",
-        "update_title": "Update Notification",
-        "update_msg": "New version available: v{0}\nCurrent version: v{1}\n\nDo you want to download the update?",
-        "btn_yes": "Download Now",
-        "btn_no": "Skip",
-        "prompt_solve_ext": "\n\n6. SPECIAL REQUIREMENT: This document contains exercises/questions. You MUST read and ANSWER/SOLVE them in detail. Create a clear, separate 'ANSWERS' section at the end of the document and write your answers there."
-    }
-}
-
-
+pyqt_imports = """
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                              QCheckBox, QComboBox, QTextEdit, QFileDialog, 
@@ -251,7 +23,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QCursor
 
-QSS = """
+QSS = \"\"\"
     QWidget {
         font-family: 'Segoe UI', Arial, sans-serif;
         font-size: 14px;
@@ -270,11 +42,6 @@ QSS = """
     }
     QPushButton:hover {
         background-color: rgba(128, 128, 128, 0.25);
-    }
-    QPushButton:checked {
-        background-color: #1f538d;
-        color: white;
-        border: none;
     }
     QPushButton#Primary {
         background-color: #1f538d;
@@ -308,8 +75,10 @@ QSS = """
     QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QListWidget:focus {
         border: 1px solid #1f538d;
     }
+\"\"\"
 """
 
+pyqt_classes = """
 
 class LanguageSelectorPopup(QDialog):
     def __init__(self, parent=None):
@@ -321,7 +90,7 @@ class LanguageSelectorPopup(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         
-        lbl = QLabel("Welcome! Please choose your preferred language.\nChào mừng! Vui lòng chọn ngôn ngữ của bạn.")
+        lbl = QLabel("Welcome! Please choose your preferred language.\\nChào mừng! Vui lòng chọn ngôn ngữ của bạn.")
         font = QFont("Segoe UI", 13, QFont.Weight.Bold)
         lbl.setFont(font)
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -339,8 +108,8 @@ class LanguageSelectorPopup(QDialog):
         self.btn_vn.setFont(QFont("Segoe UI", 12))
         
         self.group = QButtonGroup(self)
-        self.group.addButton(self.btn_en)
-        self.group.addButton(self.btn_vn)
+        self.group.addWidget(self.btn_en)
+        self.group.addWidget(self.btn_vn)
         
         layout.addWidget(self.btn_en)
         layout.addWidget(self.btn_vn)
@@ -484,11 +253,11 @@ class WorkerThread(QThread):
                         except ValueError:
                             self.write_log(self.app.t("log_reject", i+1))
                             text_result = f"> **[COPYRIGHT BLOCK: PAGE {i+1}]**"
-                            full_markdown_content += f"\n\n\n\n{text_result}\n\n"
+                            full_markdown_content += f"\\n\\n\\n\\n{text_result}\\n\\n"
                             break
                         
                         text_result = text_result.replace("[^", f"[^p{i}_")
-                        full_markdown_content += f"\n\n\n\n{text_result}\n\n"
+                        full_markdown_content += f"\\n\\n\\n\\n{text_result}\\n\\n"
                         
                         if i < len(images) - 1 and not self.app.stop_event.is_set():
                             time.sleep(3) 
@@ -507,7 +276,7 @@ class WorkerThread(QThread):
                     try:
                         doc_docx = docx.Document(output_docx_path)
                         for paragraph in doc_docx.paragraphs:
-                            if '\t' in paragraph.text:
+                            if '\\t' in paragraph.text:
                                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                                 paragraph.paragraph_format.space_after = Pt(0)
                                 paragraph.paragraph_format.space_before = Pt(0)
@@ -766,8 +535,8 @@ class PDFOCRApp(QMainWindow):
         self.btn_mode_batch.setMinimumHeight(45)
         
         self.mode_group = QButtonGroup(self)
-        self.mode_group.addButton(self.btn_mode_single)
-        self.mode_group.addButton(self.btn_mode_batch)
+        self.mode_group.addWidget(self.btn_mode_single)
+        self.mode_group.addWidget(self.btn_mode_batch)
         self.mode_group.buttonClicked.connect(self.change_mode)
         
         mode_layout.addWidget(self.btn_mode_single)
@@ -1046,7 +815,7 @@ class PDFOCRApp(QMainWindow):
                 data = json.loads(r.read().decode('utf-8'))
                 latest = data.get('tag_name', '').lstrip('v')
             if latest > CURRENT_VERSION:
-                self.write_log(f"\n[*] Cập nhật mới có sẵn: v{latest} - Vui lòng tải tại Github.")
+                self.write_log(f"\\n[*] Cập nhật mới có sẵn: v{latest} - Vui lòng tải tại Github.")
         except: pass
 
     def open_merge_popup(self):
@@ -1058,3 +827,9 @@ if __name__ == "__main__":
     window = PDFOCRApp()
     window.show()
     sys.exit(app.exec())
+"""
+
+with open("rewrite_main.py", "w", encoding="utf-8") as f:
+    f.write(constants_part + pyqt_imports + pyqt_classes)
+
+print("Generated rewrite_main.py")
