@@ -22,40 +22,32 @@ if sys.platform == "darwin":
 import customtkinter as ctk
 from tkinter import filedialog
 import fitz 
-from PIL import Image, ImageEnhance
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import pypandoc
-from PIL import Image
 
-# --- HỖ TRỢ ĐỊNH DẠNG HEIF/HEIC CỦA APPLE ---
 try:
     import pillow_heif
     pillow_heif.register_heif_opener()
 except ImportError:
     print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
-# --- CẤU HÌNH PHIÊN BẢN VÀ CẬP NHẬT ---
-CURRENT_VERSION = "1.3.3"
+CURRENT_VERSION = "2.0.0"
 GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
 def get_build_date():
-    """Hàm tự động lấy ngày build dựa vào file thực thi của PyInstaller"""
     if getattr(sys, 'frozen', False):
-        # Nếu đang chạy dạng app đã build, lấy ngày sinh ra file đó
         try:
             mtime = os.path.getmtime(sys.executable)
             return datetime.fromtimestamp(mtime)
         except: pass
-    # Nếu chạy script bình thường, lấy ngày hôm nay
     return datetime.now()
 
-# Tự động tìm thư mục Home của máy tính và tạo folder ẩn .pdfscan2word
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".pdfscan2word")
 API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
+CONFIG_JSON_FILE = os.path.join(CONFIG_DIR, "config.json")
 
-# Cấu hình UI
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
@@ -66,7 +58,7 @@ safety_config = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
-prompt_template = r"""
+PROMPT_VN = r"""
 Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
 Nhiệm vụ của bạn là trích xuất và phục hồi, làm sạch văn bản theo các quy tắc NGHIÊM NGẶT sau đây:
 1. CƠ CHẾ XUỐNG DÒNG: 
@@ -94,142 +86,443 @@ Nhiệm vụ của bạn là trích xuất và phục hồi, làm sạch văn b�
 Chỉ trả về văn bản bằng Markdown, không giải thích gì thêm.
 """
 
+PROMPT_EN = r"""
+You are a professional document digitization and restoration expert. Here is a scanned image of a document/textbook page. 
+Your task is to extract, restore, and clean the text following these STRICT rules:
+1. LINE BREAK MECHANISM: 
+   - YOU MUST insert ONE BLANK LINE (Enter twice) between paragraphs, headings, and lists to prevent clumping.
+   - Only join lines if the bottom line is a continuation of a broken sentence.
+2. TABLE OF CONTENTS (CRUCIAL): 
+   - Keep one blank line between items.
+   - YOU MUST restore Indentation by inserting `&emsp;` at the beginning of the line.
+   - ABSOLUTELY DO NOT type a dot strip (`......`) connecting the section name and page number.
+   - YOU MUST replace the entire dot strip with a SINGLE TAB character using the HTML code `&#9;`. 
+   - Standard syntax: `&emsp;1.1. Learning styles&#9;4`
+3. PREVENT AUTO BULLET POINTS: 
+   - If the original has a dash (-) at the start of a line, YOU MUST escape it: Write `\- ` instead of `- `.
+   - Numbered (1., 2.) or lettered (a., b.) items remain unchanged, DO NOT insert dashes.
+4. FORMATTING: Preserve **Bold** and *Italics* exactly as the original.
+5. FILL MISSING TEXT: Use context to fill in text cut off at the edges. Remove all garbage characters.
+6. REMOVE PAGE NUMBERS: ABSOLUTELY DO NOT transcribe page numbers at the top/bottom margins.
+7. FOOTNOTES:
+   - Place markers `[^1]`, `[^2]`... immediately after the annotated word/sentence.
+   - Write the footnote content at the very end of the text using the syntax: `[^1]: Footnote content...`
+8. PARAGRAPH INDENTATION: If a paragraph is indented on the first line in the original, insert `&emsp;&emsp;` at the beginning.
+9. TABLES - NO HTML:
+   - YOU MUST use standard Markdown table syntax (using vertical pipes `|`). ABSOLUTELY NO HTML code.
+   - MERGED CELLS: Fill the content in the first row of the merged group. Leave the rows below in the same group BLANK (e.g., `| | Math | 105 |`).
+Only return the text in Markdown, provide no additional explanations.
+"""
+
+STRINGS = {
+    "VN": {
+        "title": "Chuyển Ảnh sang Word",
+        "toolbar": "Thanh công cụ:",
+        "lang_switch": "🌐 Ngôn ngữ",
+        "merge_pdf": "🖼️ GỘP ẢNH THÀNH PDF",
+        "mode_single": "Chế độ Đơn (1 File PDF)",
+        "mode_batch": "Chế độ Hàng loạt (Thư mục)",
+        "api_key": "Google API Key:",
+        "load_api": "Tải từ file .txt",
+        "api_placeholder": "Nhập API Key...",
+        "select_pdf": "Chọn File PDF",
+        "input_pdf_ph": "Đường dẫn đến 1 file PDF...",
+        "input_dir_btn": "Thư mục Input",
+        "input_dir_ph": "Thư mục chứa nhiều file PDF...",
+        "output_dir": "Thư mục Output",
+        "output_ph": "Trống = Tự động lưu cùng nơi với Input",
+        "solve_opt": "🤖 AI Giải bài tập",
+        "cover_opt": "🖼️ Lưu riêng trang bìa",
+        "merge_opt": "📖 Gộp 2 trang làm 1 (Sách A5)",
+        "start": "▶ BẮT ĐẦU XỬ LÝ",
+        "stop": "⏹ DỪNG LẠI",
+        "timer": "Thời gian xử lý: {0:02d}:{1:02d}",
+        "timer_init": "Thời gian: 00:00",
+        "log_ready": "[*] Ứng dụng đã sẵn sàng. Hãy chọn file/thư mục để bắt đầu.",
+        "log_stop_cmd": "\n[!] NHẬN LỆNH DỪNG... Đang hủy bỏ (Vui lòng đợi 1-2 giây).",
+        "err_api": "[!] LỖI: Vui lòng nhập API Key.",
+        "err_input": "[!] LỖI: Đường dẫn Input không tồn tại.",
+        "err_output": "[!] LỖI: Thư mục Output không tồn tại.",
+        "msg_auto_out": "[*] Không chọn Output, tự động lưu cùng thư mục Input: {0}",
+        "log_no_pdf": "\n[!] Không tìm thấy file PDF nào để xử lý!",
+        "log_start_batch": "\n[>>>] BẮT ĐẦU: Sẽ xử lý {0} file PDF.",
+        "log_split": "\n[FILE {0}/{1}] Đang tách: {2}...",
+        "log_pandoc": "  [*] Đang tải trình biên dịch Word (chỉ chạy 1 lần)...",
+        "log_err_read": "  [X] LỖI ĐỌC PDF: {0}",
+        "log_save_cover": "  [+] Đã lưu ảnh bìa: {0}",
+        "log_err_cover": "  [!] Lỗi khi lưu ảnh bìa: {0}",
+        "log_merge_pages": "  [*] Đang gộp cặp trang (trái-phải) để tăng tốc độ quét...",
+        "log_read_block": "    [>] Đang đọc khối ảnh {0}/{1}...",
+        "log_reject": "      [!] LỖI BẢN QUYỀN: Google từ chối đọc trang {0}.",
+        "log_err_attempt": "      [!] Lỗi (Thử {0}/{1}): {2}",
+        "log_skip": "      [X] Bỏ qua trang {0}.",
+        "log_format_err": "  [!] Lỗi khi định dạng file Word: {0}",
+        "log_save_draft": "  [BẢN NHÁP] Đã lưu kết quả tại: {0}",
+        "log_save_ok": "  [***] Đã lưu kết quả tại: {0}",
+        "log_rescue": "  [+] Đã cứu dữ liệu dưới dạng Markdown tại: {0}",
+        "log_cancel": "\n[⏹] TIẾN TRÌNH ĐÃ BỊ HỦY BỞI NGƯỜI DÙNG.",
+        "log_done": "\n[✓] ĐÃ HOÀN TẤT!",
+        "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
+        "merge_title": "Tiện ích: Gộp ảnh thành PDF",
+        "add_img": "Thêm ảnh",
+        "up": "▲ Lên",
+        "down": "▼ Xuống",
+        "clear": "Xóa hết",
+        "compress": "🗜️ Nén giảm dung lượng",
+        "enhance": "✨ Làm sáng & Rõ chữ",
+        "export_pdf": "XUẤT RA PDF",
+        "exporting": "Đang xử lý ảnh, vui lòng đợi...",
+        "merge_success": "--- THÀNH CÔNG ---\nĐã lưu PDF: {0}",
+        "merge_err": "[!] LỖI: {0}",
+        "update_title": "Thông báo Cập nhật",
+        "update_msg": "Có phiên bản mới: v{0}\nPhiên bản hiện tại: v{1}\n\nBạn có muốn tải bản cập nhật về không?",
+        "btn_yes": "Tải ngay",
+        "btn_no": "Bỏ qua",
+        "prompt_solve_ext": "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó."
+    },
+    "EN": {
+        "title": "Image to Word Converter",
+        "toolbar": "Toolbar:",
+        "lang_switch": "🌐 Language",
+        "merge_pdf": "🖼️ MERGE IMAGES TO PDF",
+        "mode_single": "Single Mode (1 PDF file)",
+        "mode_batch": "Batch Mode (Folder)",
+        "api_key": "Google API Key:",
+        "load_api": "Load from .txt",
+        "api_placeholder": "Enter API Key...",
+        "select_pdf": "Select PDF",
+        "input_pdf_ph": "Path to a single PDF file...",
+        "input_dir_btn": "Input Folder",
+        "input_dir_ph": "Folder containing multiple PDFs...",
+        "output_dir": "Output Folder",
+        "output_ph": "Empty = Auto save next to Input",
+        "solve_opt": "🤖 AI Solves Exercises",
+        "cover_opt": "🖼️ Save cover separately",
+        "merge_opt": "📖 Merge 2 pages (A5 books)",
+        "start": "▶ START PROCESSING",
+        "stop": "⏹ STOP",
+        "timer": "Processing time: {0:02d}:{1:02d}",
+        "timer_init": "Time: 00:00",
+        "log_ready": "[*] Application ready. Please select a file/folder to start.",
+        "log_stop_cmd": "\n[!] STOP COMMAND RECEIVED... Canceling tasks (Please wait 1-2s).",
+        "err_api": "[!] ERROR: Please enter API Key.",
+        "err_input": "[!] ERROR: Input path does not exist.",
+        "err_output": "[!] ERROR: Output folder does not exist.",
+        "msg_auto_out": "[*] Output not selected, auto saving to Input folder: {0}",
+        "log_no_pdf": "\n[!] No PDF files found to process!",
+        "log_start_batch": "\n[>>>] START: Will process {0} PDF files.",
+        "log_split": "\n[FILE {0}/{1}] Extracting: {2}...",
+        "log_pandoc": "  [*] Downloading Word compiler (runs only once)...",
+        "log_err_read": "  [X] PDF READ ERROR: {0}",
+        "log_save_cover": "  [+] Saved cover image: {0}",
+        "log_err_cover": "  [!] Error saving cover: {0}",
+        "log_merge_pages": "  [*] Merging page pairs (left-right) to speed up scanning...",
+        "log_read_block": "    [>] Reading image block {0}/{1}...",
+        "log_reject": "      [!] COPYRIGHT ERROR: Google refused to read page {0}.",
+        "log_err_attempt": "      [!] Error (Attempt {0}/{1}): {2}",
+        "log_skip": "      [X] Skipping page {0}.",
+        "log_format_err": "  [!] Error formatting Word file: {0}",
+        "log_save_draft": "  [DRAFT] Result saved at: {0}",
+        "log_save_ok": "  [***] Result saved at: {0}",
+        "log_rescue": "  [+] Rescued data as Markdown at: {0}",
+        "log_cancel": "\n[⏹] PROCESS CANCELLED BY USER.",
+        "log_done": "\n[✓] COMPLETED!",
+        "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
+        "merge_title": "Utility: Merge Images to PDF",
+        "add_img": "Add Images",
+        "up": "▲ Up",
+        "down": "▼ Down",
+        "clear": "Clear All",
+        "compress": "🗜️ Compress size",
+        "enhance": "✨ Enhance & Brighten",
+        "export_pdf": "EXPORT TO PDF",
+        "exporting": "Processing images, please wait...",
+        "merge_success": "--- SUCCESS ---\nSaved PDF: {0}",
+        "merge_err": "[!] ERROR: {0}",
+        "update_title": "Update Notification",
+        "update_msg": "New version available: v{0}\nCurrent version: v{1}\n\nDo you want to download the update?",
+        "btn_yes": "Download Now",
+        "btn_no": "Skip",
+        "prompt_solve_ext": "\n\n6. SPECIAL REQUIREMENT: This document contains exercises/questions. You MUST read and ANSWER/SOLVE them in detail. Create a clear, separate 'ANSWERS' section at the end of the document and write your answers there."
+    }
+}
+
+class LanguageSelectorPopup(ctk.CTkToplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.title("Select Language / Chọn ngôn ngữ")
+        self.geometry("450x300")
+        self.resizable(False, False)
+        
+        # Center the window relative to parent
+        self.update_idletasks()
+        try:
+            x = parent.winfo_x() + (parent.winfo_width() // 2) - (450 // 2)
+            y = parent.winfo_y() + (parent.winfo_height() // 2) - (300 // 2)
+            self.geometry(f"+{x}+{y}")
+        except:
+            pass
+        
+        self.attributes("-topmost", True)
+        self.grab_set()
+        self.callback = callback
+        
+        lbl = ctk.CTkLabel(self, text="Welcome! Please choose your preferred language.\nChào mừng! Vui lòng chọn ngôn ngữ của bạn.", font=("Segoe UI", 15, "bold"))
+        lbl.pack(pady=(35, 20))
+        
+        self.lang_var = ctk.StringVar(value="EN")
+        
+        r_en = ctk.CTkRadioButton(self, text="🇺🇸 English", variable=self.lang_var, value="EN", font=("Segoe UI", 16))
+        r_en.pack(pady=10)
+        
+        r_vn = ctk.CTkRadioButton(self, text="🇻🇳 Tiếng Việt", variable=self.lang_var, value="VN", font=("Segoe UI", 16))
+        r_vn.pack(pady=10)
+        
+        btn = ctk.CTkButton(self, text="Continue / Tiếp tục", font=("Segoe UI", 15, "bold"), height=45, corner_radius=10, fg_color="#2b7a4b", hover_color="#1e5c37", command=self.on_save)
+        btn.pack(pady=25)
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_save_default)
+        
+    def on_save(self):
+        self.callback(self.lang_var.get())
+        self.destroy()
+        
+    def on_save_default(self):
+        self.callback("EN") # default fallback
+        self.destroy()
+
 class PDFOCRApp(ctk.CTk):
     def __init__(self):
-        
         super().__init__()
 
-        self.title("Scanned Images to Word v" + CURRENT_VERSION)
-        self.geometry("780x800")
+        self.current_lang = "VN" # Default
+        self.load_config()
+
+        self.title(self.t("title") + " v" + CURRENT_VERSION)
+        self.geometry("840x880")
+        self.minsize(840, 880)
+
+        # Base font configs
+        self.font_main = ("Segoe UI", 14)
+        self.font_bold = ("Segoe UI", 14, "bold")
+        self.font_large = ("Segoe UI", 16, "bold")
+        self.card_kwargs = {"fg_color": ("gray90", "gray13"), "corner_radius": 12}
+
         self.stop_event = threading.Event()
         self.start_time = None
         self.timer_running = False
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        # --- 0. MENU BAR TRÊN CÙNG ---
-        self.frame_menu = ctk.CTkFrame(self, height=45, corner_radius=0, fg_color=("gray85", "gray20"))
-        self.frame_menu.pack(side="top", fill="x")
+        self.build_ui()
+        self.update_ui_texts() 
         
-        self.lbl_toolbar = ctk.CTkLabel(self.frame_menu, text="Thanh công cụ:", font=("Arial", 13, "bold"))
-        self.lbl_toolbar.pack(side="left", padx=(20, 10), pady=10)
+        if not os.path.exists(CONFIG_JSON_FILE):
+            self.after(200, self.show_language_popup_first_time)
+            
+        threading.Thread(target=self.check_for_updates, daemon=True).start()
 
-        # Nút gộp ảnh với nền xanh lá nổi bật
-        self.btn_merge = ctk.CTkButton(self.frame_menu, text="GỘP ẢNH THÀNH PDF", font=("Arial", 12, "bold"), 
+    def t(self, key, *args):
+        text = STRINGS.get(self.current_lang, STRINGS["VN"]).get(key, key)
+        if args:
+            return text.format(*args)
+        return text
+
+    def load_config(self):
+        if os.path.exists(CONFIG_JSON_FILE):
+            try:
+                with open(CONFIG_JSON_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.current_lang = data.get("lang", "VN")
+            except:
+                pass
+
+    def save_config(self):
+        if not os.path.exists(CONFIG_DIR):
+            os.makedirs(CONFIG_DIR)
+        try:
+            with open(CONFIG_JSON_FILE, "w", encoding="utf-8") as f:
+                json.dump({"lang": self.current_lang}, f)
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
+    def show_language_popup_first_time(self):
+        LanguageSelectorPopup(self, self.on_language_selected_first_time)
+        
+    def on_language_selected_first_time(self, lang):
+        self.current_lang = lang
+        self.save_config()
+        self.lang_var.set("EN (English)" if lang == "EN" else "VN (Tiếng Việt)")
+        self.update_ui_texts()
+
+    def build_ui(self):
+        # --- 0. MENU BAR TRÊN CÙNG ---
+        self.frame_menu = ctk.CTkFrame(self, height=65, corner_radius=0, fg_color=("gray85", "gray20"))
+        self.frame_menu.pack(side="top", fill="x")
+        self.frame_menu.pack_propagate(False)
+        
+        self.lbl_toolbar = ctk.CTkLabel(self.frame_menu, text="", font=self.font_bold)
+        self.lbl_toolbar.pack(side="left", padx=(20, 10), pady=15)
+
+        self.btn_merge = ctk.CTkButton(self.frame_menu, text="", font=self.font_bold, height=45, corner_radius=10,
                                        fg_color="#2b7a4b", hover_color="#1e5c37", text_color="white", 
                                        command=self.open_merge_popup)
         self.btn_merge.pack(side="left", padx=5, pady=10)
 
-        # --- 1. CHỌN CHẾ ĐỘ (MODE SWITCHER) ---
-        self.frame_mode = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_mode.pack(pady=(15, 5), padx=20, fill="x")
+        # Dropdown Language Selector
+        self.lbl_lang_icon = ctk.CTkLabel(self.frame_menu, text="🌐", font=("Segoe UI", 18))
+        self.lbl_lang_icon.pack(side="right", padx=(5, 20), pady=15)
         
-        self.mode_var = ctk.StringVar(value="Chế độ Đơn (1 File PDF)")
-        self.mode_selector = ctk.CTkSegmentedButton(self.frame_mode, 
-                                                    values=["Chế độ Đơn (1 File PDF)", "Chế độ Hàng loạt (Thư mục)"], 
-                                                    variable=self.mode_var, 
-                                                    command=self.change_mode)
-        self.mode_selector.pack(side="left")
+        self.lang_var = ctk.StringVar(value="EN (English)" if self.current_lang == "EN" else "VN (Tiếng Việt)")
+        self.lang_menu = ctk.CTkOptionMenu(self.frame_menu, values=["EN (English)", "VN (Tiếng Việt)"],
+                                           variable=self.lang_var, command=self.change_language,
+                                           font=self.font_main, width=150, height=38)
+        self.lang_menu.pack(side="right", padx=5, pady=12)
 
-        # --- 2. API KEY ---
-        self.frame_api = ctk.CTkFrame(self)
-        self.frame_api.pack(pady=5, padx=20, fill="x")
+        # Container for main content
+        self.main_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_container.pack(fill="both", expand=True, padx=25, pady=10)
+
+        # --- 1. CHỌN CHẾ ĐỘ (MODE SWITCHER) ---
+        self.frame_mode = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.frame_mode.pack(pady=(10, 15), fill="x")
         
-        self.lbl_api = ctk.CTkLabel(self.frame_api, text="Google API Key:", width=100, anchor="w")
-        self.lbl_api.pack(side="left", padx=10, pady=10)
+        self.mode_var = ctk.StringVar(value="1")
+        self.mode_selector = ctk.CTkSegmentedButton(self.frame_mode, 
+                                                    values=["1", "2"], 
+                                                    variable=self.mode_var, 
+                                                    command=self.change_mode,
+                                                    height=45, font=self.font_bold)
+        self.mode_selector.pack(expand=True, fill="x", padx=10)
+
+        # --- 2. API KEY CARD ---
+        self.frame_api = ctk.CTkFrame(self.main_container, **self.card_kwargs)
+        self.frame_api.pack(pady=10, fill="x", ipady=10)
         
-        self.entry_api = ctk.CTkEntry(self.frame_api, show="*", width=380, placeholder_text="Nhập API Key...")
-        self.entry_api.pack(side="left", padx=10, pady=10)
+        self.lbl_api = ctk.CTkLabel(self.frame_api, text="", width=120, anchor="w", font=self.font_bold)
+        self.lbl_api.pack(side="left", padx=15, pady=10)
         
-        self.btn_load_api = ctk.CTkButton(self.frame_api, text="Tải từ file .txt", width=120, command=self.load_api_from_file)
-        self.btn_load_api.pack(side="left", padx=10, pady=10)
+        self.entry_api = ctk.CTkEntry(self.frame_api, show="*", height=45, placeholder_text="", font=self.font_main, corner_radius=10)
+        self.entry_api.pack(side="left", padx=10, pady=10, expand=True, fill="x")
+        
+        self.btn_load_api = ctk.CTkButton(self.frame_api, text="", width=140, height=45, font=self.font_bold, corner_radius=10, command=self.load_api_from_file)
+        self.btn_load_api.pack(side="right", padx=15, pady=10)
         self.load_saved_api_key()
 
-        # --- 3. INPUT / OUTPUT ---
-        self.frame_input = ctk.CTkFrame(self)
-        self.frame_input.pack(pady=5, padx=20, fill="x")
+        # --- 3. INPUT / OUTPUT CARD ---
+        self.frame_io = ctk.CTkFrame(self.main_container, **self.card_kwargs)
+        self.frame_io.pack(pady=10, fill="x", ipady=10)
         
-        # Nút Input sẽ thay đổi text tùy theo Mode
-        self.btn_input = ctk.CTkButton(self.frame_input, text="Chọn File PDF", width=120, command=self.browse_input)
-        self.btn_input.pack(side="left", padx=10, pady=10)
-        self.entry_input = ctk.CTkEntry(self.frame_input, width=500, placeholder_text="Đường dẫn đến 1 file PDF...")
-        self.entry_input.pack(side="left", padx=10, pady=10)
+        # Input
+        self.io_inner1 = ctk.CTkFrame(self.frame_io, fg_color="transparent")
+        self.io_inner1.pack(fill="x", padx=10, pady=(10, 5))
+        self.btn_input = ctk.CTkButton(self.io_inner1, text="", width=160, height=45, font=self.font_bold, corner_radius=10, command=self.browse_input)
+        self.btn_input.pack(side="left", padx=5)
+        self.entry_input = ctk.CTkEntry(self.io_inner1, height=45, placeholder_text="", font=self.font_main, corner_radius=10)
+        self.entry_input.pack(side="left", padx=10, expand=True, fill="x")
 
-        self.frame_output = ctk.CTkFrame(self)
-        self.frame_output.pack(pady=5, padx=20, fill="x")
-        self.btn_output = ctk.CTkButton(self.frame_output, text="Thư mục Output", width=120, command=self.browse_output)
-        self.btn_output.pack(side="left", padx=10, pady=10)
-        self.entry_output = ctk.CTkEntry(self.frame_output, width=500, placeholder_text="Trống = Tự động lưu cùng nơi với File/Thư mục Input")
-        self.entry_output.pack(side="left", padx=10, pady=10)
+        # Output
+        self.io_inner2 = ctk.CTkFrame(self.frame_io, fg_color="transparent")
+        self.io_inner2.pack(fill="x", padx=10, pady=(5, 10))
+        self.btn_output = ctk.CTkButton(self.io_inner2, text="", width=160, height=45, font=self.font_bold, corner_radius=10, command=self.browse_output)
+        self.btn_output.pack(side="left", padx=5)
+        self.entry_output = ctk.CTkEntry(self.io_inner2, height=45, placeholder_text="", font=self.font_main, corner_radius=10)
+        self.entry_output.pack(side="left", padx=10, expand=True, fill="x")
 
         # --- CÁC TÙY CHỌN MỞ RỘNG ---
-        self.frame_options = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_options.pack(pady=5, padx=20, fill="x")
+        self.frame_options = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.frame_options.pack(pady=15, fill="x")
         
         self.solve_var = ctk.BooleanVar(value=False)
-        self.chk_solve = ctk.CTkCheckBox(self.frame_options, text="🤖 Yêu cầu AI Giải bài tập", variable=self.solve_var, font=("Arial", 12, "bold"))
+        self.chk_solve = ctk.CTkCheckBox(self.frame_options, text="", variable=self.solve_var, font=self.font_bold)
         self.chk_solve.pack(side="left", padx=10)
 
-        # Checkbox mới: Lưu riêng trang bìa
         self.cover_var = ctk.BooleanVar(value=False)
-        self.chk_cover = ctk.CTkCheckBox(self.frame_options, text="🖼️ Lưu riêng trang bìa", variable=self.cover_var, font=("Arial", 12, "bold"))
-        self.chk_cover.pack(side="left", padx=10)
+        self.chk_cover = ctk.CTkCheckBox(self.frame_options, text="", variable=self.cover_var, font=self.font_bold)
+        self.chk_cover.pack(side="left", padx=20)
 
-        # Checkbox mới: Gộp 2 trang
         self.merge_pages_var = ctk.BooleanVar(value=False)
-        self.chk_merge_pages = ctk.CTkCheckBox(self.frame_options, text="📖 Gộp 2 trang làm 1 (Tăng tốc sách A5)", variable=self.merge_pages_var, font=("Arial", 12, "bold"))
+        self.chk_merge_pages = ctk.CTkCheckBox(self.frame_options, text="", variable=self.merge_pages_var, font=self.font_bold)
         self.chk_merge_pages.pack(side="left", padx=10)
 
-        # --- 4. NÚT ĐIỀU KHIỂN ---
-        self.frame_buttons = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_buttons.pack(pady=10)
+        # --- 4. NÚT ĐIỀU KHIỂN CHIẾM VỊ TRÍ LỚN ---
+        self.frame_buttons = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.frame_buttons.pack(pady=15, fill="x")
         
-        self.btn_start = ctk.CTkButton(self.frame_buttons, text="▶ BẮT ĐẦU XỬ LÝ", font=("Arial", 14, "bold"), command=self.start_processing)
-        self.btn_start.pack(side="left", padx=10)
+        self.btn_start = ctk.CTkButton(self.frame_buttons, text="", font=("Segoe UI", 18, "bold"), height=60, corner_radius=12,
+                                       fg_color="#1f538d", hover_color="#14375e", command=self.start_processing)
+        self.btn_start.pack(side="left", expand=True, fill="x", padx=10)
 
-        self.btn_stop = ctk.CTkButton(self.frame_buttons, text="⏹ DỪNG LẠI", font=("Arial", 14, "bold"), fg_color="#a83232", hover_color="#7a2121", state="disabled", command=self.stop_processing)
-        self.btn_stop.pack(side="left", padx=10)
+        self.btn_stop = ctk.CTkButton(self.frame_buttons, text="", font=("Segoe UI", 18, "bold"), height=60, corner_radius=12,
+                                      fg_color="#a83232", hover_color="#7a2121", state="disabled", command=self.stop_processing)
+        self.btn_stop.pack(side="right", expand=True, fill="x", padx=10)
 
         # --- ĐỒNG HỒ ĐẾM GIỜ ---
-        self.lbl_timer = ctk.CTkLabel(self, text="Thời gian xử lý: 00:00", font=("Arial", 13, "bold"), text_color="#3a7ebf")
-        self.lbl_timer.pack(pady=(0, 5))
+        self.lbl_timer = ctk.CTkLabel(self.main_container, text="", font=("Segoe UI", 15, "bold"), text_color="#3a7ebf")
+        self.lbl_timer.pack(pady=(0, 10))
 
         # --- 5. LOG TRUNG TÂM ---
-        self.log_box = ctk.CTkTextbox(self, width=740, height=350, font=("Consolas", 13))
-        self.log_box.pack(pady=10, padx=20)
-        self.log_box.insert("0.0", "[*] Ứng dụng đã sẵn sàng. Hãy chọn file/thư mục để bắt đầu.\n")
+        self.log_box = ctk.CTkTextbox(self.main_container, height=220, font=("Consolas", 14), **self.card_kwargs)
+        self.log_box.pack(pady=5, fill="both", expand=True)
+        self.log_box.insert("0.0", self.t("log_ready") + "\n")
         self.log_box.configure(state="disabled")
 
-        # --- Khởi chạy luồng kiểm tra cập nhật ngầm ---
-        threading.Thread(target=self.check_for_updates, daemon=True).start()
-
-        # --- 6. FOOTER (MỞ CỬA SỔ ABOUT MAC STYLE) ---
+        # --- 6. FOOTER ---
         build_date = get_build_date()
         self.build_str = build_date.strftime("%Y%m%d")
         self.year_str = build_date.strftime("%Y")
 
-        footer_text = f"Developed by @tozn607 | Version v{CURRENT_VERSION} Build {self.build_str} | © {self.year_str}"
-        self.lbl_footer = ctk.CTkLabel(self, text=footer_text, text_color="gray50", font=("Arial", 12), cursor="hand2")
-        self.lbl_footer.pack(side="bottom", pady=(0, 10))
-        
-        # Gắn sự kiện: Bấm vào dòng này sẽ mở cửa sổ About
+        self.lbl_footer = ctk.CTkLabel(self.main_container, text="", text_color="gray50", font=("Segoe UI", 13), cursor="hand2")
+        self.lbl_footer.pack(side="bottom", pady=(10, 0))
         self.lbl_footer.bind("<Button-1>", self.show_about_popup)
 
-    # --- HÀM THAY ĐỔI GIAO DIỆN THEO CHẾ ĐỘ ---
+
+    def update_ui_texts(self):
+        self.title(self.t("title") + " v" + CURRENT_VERSION)
+        self.lbl_toolbar.configure(text=self.t("toolbar"))
+        self.btn_merge.configure(text=self.t("merge_pdf"))
+        self.lbl_api.configure(text=self.t("api_key"))
+        self.btn_load_api.configure(text=self.t("load_api"))
+        self.entry_api.configure(placeholder_text=self.t("api_placeholder"))
+        
+        old_mode_idx = 0 if self.mode_var.get() in ("1", self.t("mode_single")) else 1
+        new_values = [self.t("mode_single"), self.t("mode_batch")]
+        self.mode_selector.configure(values=new_values)
+        self.mode_var.set(new_values[old_mode_idx])
+        
+        self.chk_solve.configure(text=self.t("solve_opt"))
+        self.chk_cover.configure(text=self.t("cover_opt"))
+        self.chk_merge_pages.configure(text=self.t("merge_opt"))
+        self.btn_start.configure(text=self.t("start"))
+        self.btn_stop.configure(text=self.t("stop"))
+        
+        self.change_mode(self.mode_var.get())
+        self.btn_output.configure(text=self.t("output_dir"))
+        self.entry_output.configure(placeholder_text=self.t("output_ph"))
+        self.lbl_timer.configure(text=self.t("timer_init"))
+        
+        footer_text = self.t("dev_footer", CURRENT_VERSION, self.build_str, self.year_str)
+        self.lbl_footer.configure(text=footer_text)
+        
+    def change_language(self, choice):
+        new_lang = "VN" if "VN" in choice else "EN"
+        if new_lang != self.current_lang:
+            self.current_lang = new_lang
+            self.save_config()
+            self.update_ui_texts()
+
     def change_mode(self, selected_mode):
         self.entry_input.delete(0, "end")
-        if selected_mode == "Chế độ Đơn (1 File PDF)":
-            self.btn_input.configure(text="Chọn File PDF")
-            self.entry_input.configure(placeholder_text="Đường dẫn đến 1 file PDF...")
+        if selected_mode == self.t("mode_single"):
+            self.btn_input.configure(text=self.t("select_pdf"))
+            self.entry_input.configure(placeholder_text=self.t("input_pdf_ph"))
         else:
-            self.btn_input.configure(text="Thư mục Input")
-            self.entry_input.configure(placeholder_text="Thư mục chứa nhiều file PDF...")
+            self.btn_input.configure(text=self.t("input_dir_btn"))
+            self.entry_input.configure(placeholder_text=self.t("input_dir_ph"))
 
-    # --- HÀM ĐIỀU KHIỂN HỆ THỐNG VÀ API KEY ---
     def on_closing(self):
         current_key = self.entry_api.get().strip()
         if current_key:
             self.save_api_key(current_key)
-
         self.stop_event.set() 
         self.destroy() 
         os._exit(0)
@@ -261,9 +554,8 @@ class PDFOCRApp(ctk.CTk):
                 key = f.read().strip()
                 self.entry_api.delete(0, "end")
                 self.entry_api.insert(0, key)
-                self.write_log("[+] Đã tải API Key từ file.")
+                self.write_log("[+] API Key loaded.")
 
-    # --- HÀM TƯƠNG TÁC NGƯỜI DÙNG ---
     def write_log(self, message):
         self.log_box.configure(state="normal")
         self.log_box.insert("end", message + "\n")
@@ -272,23 +564,23 @@ class PDFOCRApp(ctk.CTk):
 
     def browse_input(self):
         current_mode = self.mode_var.get()
-        if current_mode == "Chế độ Đơn (1 File PDF)":
-            path = filedialog.askopenfilename(title="Chọn 1 file PDF", filetypes=[("PDF", "*.pdf")])
+        if current_mode == self.t("mode_single"):
+            path = filedialog.askopenfilename(title=self.t("select_pdf"), filetypes=[("PDF", "*.pdf")])
         else:
-            path = filedialog.askdirectory(title="Chọn thư mục chứa PDF")
+            path = filedialog.askdirectory(title=self.t("input_dir_btn"))
             
         if path:
             self.entry_input.delete(0, "end")
             self.entry_input.insert(0, path)
 
     def browse_output(self):
-        folder_path = filedialog.askdirectory(title="Chọn thư mục lưu kết quả")
+        folder_path = filedialog.askdirectory(title=self.t("output_dir"))
         if folder_path:
             self.entry_output.delete(0, "end")
             self.entry_output.insert(0, folder_path)
 
     def stop_processing(self):
-        self.write_log("\n[!] NHẬN LỆNH DỪNG... Đang hủy bỏ các tiến trình (Vui lòng đợi 1-2 giây).")
+        self.write_log(self.t("log_stop_cmd"))
         self.stop_event.set()
 
     def start_processing(self):
@@ -298,28 +590,25 @@ class PDFOCRApp(ctk.CTk):
         current_mode = self.mode_var.get()
 
         if not api_key:
-            self.write_log("[!] LỖI: Vui lòng nhập API Key.")
+            self.write_log(self.t("err_api"))
             return
         if not input_path or not os.path.exists(input_path):
-            self.write_log(f"[!] LỖI: Đường dẫn Input không tồn tại.")
+            self.write_log(self.t("err_input"))
             return
 
-        # TỰ ĐỘNG XỬ LÝ NẾU BỎ TRỐNG OUTPUT THƯ MỤC
         if not output_dir:
-            # Kiểm tra xem Input là thư mục (Chế độ hàng loạt) hay file (Chế độ đơn)
             if os.path.isdir(input_path):
                 output_dir = input_path
             else:
-                output_dir = os.path.dirname(input_path) # Cắt lấy đường dẫn thư mục chứa file
+                output_dir = os.path.dirname(input_path) 
                 
-            self.write_log(f"[*] Không chọn Output, tự động lưu cùng thư mục Input: {output_dir}")
+            self.write_log(self.t("msg_auto_out", output_dir))
         elif not os.path.exists(output_dir):
-            self.write_log("[!] LỖI: Thư mục Output không tồn tại.")
+            self.write_log(self.t("err_output"))
             return
 
         self.save_api_key(api_key)
 
-        # Bắt đầu tính giờ
         self.start_time = datetime.now()
         self.timer_running = True
         self.update_timer_ui()
@@ -333,146 +622,115 @@ class PDFOCRApp(ctk.CTk):
         self.stop_event.clear()
         genai.configure(api_key=api_key)
 
-        # Chạy luồng xử lý chung cho cả 2 mode
         thread = threading.Thread(target=self.process_documents, args=(input_path, output_dir, current_mode))
         thread.daemon = True
         thread.start()
 
-    # --- HÀM XỬ LÝ LÕI TỔNG HỢP ---
     def process_documents(self, input_path, output_dir, mode):
-        # Lập danh sách các file cần chạy dựa vào Mode
-        if mode == "Chế độ Đơn (1 File PDF)":
+        if mode == self.t("mode_single"):
             pdf_files = [input_path]
         else:
             pdf_files = [os.path.join(input_path, f) for f in os.listdir(input_path) if f.lower().endswith('.pdf')]
         
         if not pdf_files:
-            self.write_log("\n[!] Không tìm thấy file PDF nào để xử lý!")
+            self.write_log(self.t("log_no_pdf"))
             self.reset_ui()
             return
 
         total_files = len(pdf_files)
-        self.write_log(f"\n[>>>] BẮT ĐẦU: Sẽ xử lý {total_files} file PDF.")
+        self.write_log(self.t("log_start_batch", total_files))
         model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
 
-        # DYNAMIC PROMPT: Nối thêm lệnh giải bài tập nếu được tick
-        active_prompt = prompt_template
+        active_prompt = PROMPT_EN if self.current_lang == "EN" else PROMPT_VN
         if self.solve_var.get():
-            active_prompt += "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó."
+            active_prompt += self.t("prompt_solve_ext")
 
         for file_idx, pdf_path in enumerate(pdf_files):
             if self.stop_event.is_set(): break
 
             pdf_filename = os.path.basename(pdf_path)
             base_name = os.path.splitext(pdf_filename)[0]
-            output_docx_path = os.path.join(output_dir, f"{base_name}_hoanthien.docx")
+            suffix = "_hoanthien" if self.current_lang == "VN" else "_completed"
+            output_docx_path = os.path.join(output_dir, f"{base_name}{suffix}.docx")
 
-            self.write_log(f"\n[FILE {file_idx + 1}/{total_files}] Đang tách: {pdf_filename}...")
+            self.write_log(self.t("log_split", file_idx + 1, total_files, pdf_filename))
             
             images = []
             try: 
-                # --- AUTO-INSTALL PANDOC TỐI ƯU CHO APP ĐÓNG GÓI ---
-                # Khai báo trước đường dẫn Pandoc sẽ nằm ở thư mục ~/.pdfscan2word
                 pandoc_exe = os.path.join(CONFIG_DIR, "pandoc" + (".exe" if sys.platform == "win32" else ""))
-                
-                # Nếu file pandoc đã từng được tải về, ép pypandoc xài luôn file đó
                 if os.path.exists(pandoc_exe):
                     os.environ['PYPANDOC_PANDOC'] = pandoc_exe
 
                 try:
                     pypandoc.get_pandoc_version()
                 except OSError:
-                    self.write_log("  [*] Đang tải và thiết lập trình biên dịch Word (chỉ chạy 1 lần)...")
-                    # Ép tải file nén và giải nén thẳng vào thư mục ~/.pdfscan2word
+                    self.write_log(self.t("log_pandoc"))
                     pypandoc.download_pandoc(targetfolder=CONFIG_DIR, download_folder=CONFIG_DIR)
-                    # Cập nhật lại đường dẫn cho hệ thống nhận diện
                     os.environ['PYPANDOC_PANDOC'] = pandoc_exe
 
-                # --- ĐỌC PDF BẰNG PYMUPDF ---
                 doc = fitz.open(pdf_path)
                 for page in doc:
-                    # Chụp ảnh trang PDF ở độ phân giải cao (tương đương 200-300 dpi)
                     pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                    
-                    # Chuyển đổi dữ liệu ảnh của Fitz sang chuẩn của Pillow (PIL)
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                     images.append(img)
                     
             except Exception as e:
-                self.write_log(f"  [X] LỖI ĐỌC PDF: {e}")
+                self.write_log(self.t("log_err_read", e))
                 continue 
 
             if not images:
                 continue
 
-            # --- XỬ LÝ TRANG BÌA ---
             start_idx = 0
             if self.cover_var.get():
-                # Tạo tên file ảnh bìa: "TenFilePDF_cover.jpg"
                 cover_path = os.path.join(output_dir, f"{base_name}_cover.jpg")
                 try:
                     images[0].save(cover_path, "JPEG")
-                    self.write_log(f"  [+] Đã lưu ảnh bìa: {base_name}_cover.jpg")
+                    self.write_log(self.t("log_save_cover", f"{base_name}_cover.jpg"))
                 except Exception as e:
-                    self.write_log(f"  [!] Lỗi khi lưu ảnh bìa: {e}")
-                
-                # Bắt đầu vòng lặp đọc chữ từ trang số 2 (index 1)
+                    self.write_log(self.t("log_err_cover", e))
                 start_idx = 1 
 
-            # --- THUẬT TOÁN GỘP 2 TRANG THÀNH 1 SPREAD TĂNG TỐC ---
             processed_images = []
             if self.merge_pages_var.get():
-                self.write_log("  [*] Đang gộp cặp trang (trái-phải) để tăng tốc độ quét...")
+                self.write_log(self.t("log_merge_pages"))
                 for i in range(start_idx, len(images), 2):
                     img_left = images[i]
-                    # Nếu còn trang tiếp theo để ghép thành cặp
                     if i + 1 < len(images):
                         img_right = images[i+1]
-                        # Tính toán kích thước canvas mới: Rộng = 2 ảnh cộng lại, Cao = ảnh cao nhất
                         total_width = img_left.width + img_right.width
                         max_height = max(img_left.height, img_right.height)
-                        
-                        # Tạo khung nền mới và dán 2 ảnh vào (trái, phải)
                         new_img = Image.new('RGB', (total_width, max_height))
                         new_img.paste(img_left, (0, 0))
                         new_img.paste(img_right, (img_left.width, 0))
                         processed_images.append(new_img)
                     else:
-                        # Bị lẻ trang cuối cùng thì ném thẳng vào luôn
                         processed_images.append(img_left)
             else:
-                # Nếu không tick gộp, thì cứ để nguyên từng trang
                 processed_images = images[start_idx:]
 
             full_markdown_content = ""
             max_retries = 5 
 
-            # Vòng lặp bây giờ sẽ chạy trên danh sách ảnh đã được xử lý
             for i, image in enumerate(processed_images):
                 if self.stop_event.is_set():
-                    self.write_log(f"  [-] Đã dừng. Đang đóng gói dữ liệu đã quét được của file {pdf_filename}...")
                     break
 
-                self.write_log(f"    [>] Đang đọc khối ảnh {i+1}/{len(processed_images)}...")
+                self.write_log(self.t("log_read_block", i+1, len(processed_images)))
                 
                 for attempt in range(max_retries):
                     if self.stop_event.is_set(): break
                     try:
                         response = model.generate_content([active_prompt, image], safety_settings=safety_config)
-                        
                         try:
                             text_result = response.text
                         except ValueError:
-                            self.write_log(f"      [!] LỖI BẢN QUYỀN: Google từ chối đọc trang {i+1}.")
-                            text_result = f"> **[LỖI: TỪ CHỐI NHẬN DIỆN TRANG {i+1} DO VƯỚNG BẢN QUYỀN]**"
+                            self.write_log(self.t("log_reject", i+1))
+                            text_result = f"> **[COPYRIGHT BLOCK: PAGE {i+1}]**"
                             full_markdown_content += f"\n\n\n\n{text_result}\n\n"
                             break
                         
-                        # [TRICK XỬ LÝ FOOTNOTE] 
-                        # Biến [^1] thành [^p1_1], [^p2_1] để tránh các trang bị trùng ID footnote của nhau khi gộp lại.
-                        # Pandoc sẽ tự động sắp xếp và đánh số lại từ 1, 2, 3... trong Word một cách hoàn hảo.
                         text_result = text_result.replace("[^", f"[^p{i}_")
-                        
                         full_markdown_content += f"\n\n\n\n{text_result}\n\n"
                         
                         if i < len(images) - 1 and not self.stop_event.is_set():
@@ -480,41 +738,28 @@ class PDFOCRApp(ctk.CTk):
                         break 
                         
                     except Exception as e:
-                        self.write_log(f"      [!] Lỗi (Thử {attempt+1}/{max_retries}): {e}")
+                        self.write_log(self.t("log_err_attempt", attempt+1, max_retries, e))
                         if attempt < max_retries - 1:
                             time.sleep(60) 
                         else:
-                            self.write_log(f"      [X] Bỏ qua trang {i+1}.")
+                            self.write_log(self.t("log_skip", i+1))
 
-            # --- LƯU FILE (CHẠY KỂ CẢ KHI BỊ DỪNG) ---
             if full_markdown_content.strip():
                 try:
-                    # 1. Pandoc tạo ra file Word trần trụi
                     pypandoc.convert_text(full_markdown_content, 'docx', format='md', outputfile=output_docx_path)
-                    
-                    # 2. Can thiệp bằng python-docx: CĂN ĐỀU LỀ, XỬ LÝ MỤC LỤC & KẺ BẢNG
                     try:
-                        doc = docx.Document(output_docx_path)
-                        
-                        # --- A. XỬ LÝ CĂN LỀ, KHOẢNG TRẮNG VÀ MỤC LỤC ---
-                        for paragraph in doc.paragraphs:
-                            # Nhận diện dòng Mục lục: Chứa ký tự Tab (\t) do mã &#9; tạo ra
+                        doc_docx = docx.Document(output_docx_path)
+                        for paragraph in doc_docx.paragraphs:
                             if '\t' in paragraph.text:
                                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
                                 paragraph.paragraph_format.space_after = Pt(0)
                                 paragraph.paragraph_format.space_before = Pt(0)
-                                
-                                # Xóa các cài đặt Tab mặc định (nếu có)
                                 paragraph.paragraph_format.tab_stops.clear_all()
-                                
-                                # Đặt một điểm dừng Tab ở vị trí 16cm (Sát mép phải khổ A4), Căn phải, có dải chấm nối
                                 paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(16), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
                             else:
-                                # Với các đoạn văn bình thường: Ép Căn đều 2 bên (Justify)
                                 paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-                        # --- B. KẺ VIỀN CHO TẤT CẢ CÁC BẢNG ---
-                        for table in doc.tables:
+                        for table in doc_docx.tables:
                             tblPr = table._tbl.tblPr
                             tblBorders = OxmlElement('w:tblBorders')
                             for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
@@ -526,43 +771,42 @@ class PDFOCRApp(ctk.CTk):
                                 tblBorders.append(border)
                             tblPr.append(tblBorders)
                             
-                        doc.save(output_docx_path)
+                        doc_docx.save(output_docx_path)
                     except Exception as e_docx:
-                        self.write_log(f"  [!] Lỗi khi định dạng file Word: {e_docx}")
+                        self.write_log(self.t("log_format_err", e_docx))
 
-                    prefix = "[BẢN NHÁP]" if self.stop_event.is_set() else "[***]"
-                    self.write_log(f"  {prefix} Đã lưu kết quả tại: {output_docx_path}")
+                    if self.stop_event.is_set():
+                        self.write_log(self.t("log_save_draft", output_docx_path))
+                    else:
+                        self.write_log(self.t("log_save_ok", output_docx_path))
                 except Exception as e:
-                    # Nếu lỗi Docx, lưu tạm file Markdown để cứu dữ liệu
                     md_path = output_docx_path.replace('.docx', '.md')
                     with open(md_path, 'w', encoding='utf-8') as f: 
                         f.write(full_markdown_content)
-                    self.write_log(f"  [+] Đã cứu dữ liệu dưới dạng Markdown tại: {md_path}")
+                    self.write_log(self.t("log_rescue", md_path))
             
-            # Nếu đang ở chế độ hàng loạt (nhiều file PDF) và bấm dừng, thì thoát luôn vòng lặp file lớn
             if self.stop_event.is_set():
                 break
 
         if self.stop_event.is_set():
-            self.write_log("\n[⏹] TIẾN TRÌNH ĐÃ BỊ HỦY BỞI NGƯỜI DÙNG.")
+            self.write_log(self.t("log_cancel"))
         else:
-            self.write_log("\n[✓] ĐÃ HOÀN TẤT!")
+            self.write_log(self.t("log_done"))
         
         self.reset_ui()
 
     def reset_ui(self):
-        self.timer_running = False # Dừng đồng hồ
+        self.timer_running = False 
         self.btn_start.configure(state="normal")
         self.btn_input.configure(state="normal")
         self.btn_output.configure(state="normal")
         self.mode_selector.configure(state="normal")
         self.btn_stop.configure(state="disabled")
 
-    # --- TÍNH NĂNG GỘP ẢNH ---
     def open_merge_popup(self):
         self.merge_window = ctk.CTkToplevel(self)
-        self.merge_window.title("Tiện ích: Gộp ảnh thành PDF")
-        self.merge_window.geometry("600x450")
+        self.merge_window.title(self.t("merge_title"))
+        self.merge_window.geometry("660x520")
         self.merge_window.attributes("-topmost", True)
         self.merge_window.grab_set()
 
@@ -571,51 +815,44 @@ class PDFOCRApp(ctk.CTk):
         frame_controls = ctk.CTkFrame(self.merge_window, fg_color="transparent")
         frame_controls.pack(pady=10, padx=20, fill="x")
 
-        # Nút Thêm
-        btn_add = ctk.CTkButton(frame_controls, text="Thêm ảnh", width=100, command=self.add_images)
+        btn_add = ctk.CTkButton(frame_controls, text=self.t("add_img"), width=120, height=40, corner_radius=10, font=self.font_bold, command=self.add_images)
         btn_add.pack(side="left", padx=5)
 
-        # Nút Đảo vị trí
-        btn_up = ctk.CTkButton(frame_controls, text="▲ Lên", width=70, fg_color="#454545", hover_color="#5a5a5a", command=self.move_up)
+        btn_up = ctk.CTkButton(frame_controls, text=self.t("up"), width=80, height=40, corner_radius=10, font=self.font_bold, fg_color="#454545", hover_color="#5a5a5a", command=self.move_up)
         btn_up.pack(side="left", padx=5)
         
-        btn_down = ctk.CTkButton(frame_controls, text="▼ Xuống", width=70, fg_color="#454545", hover_color="#5a5a5a", command=self.move_down)
+        btn_down = ctk.CTkButton(frame_controls, text=self.t("down"), width=80, height=40, corner_radius=10, font=self.font_bold, fg_color="#454545", hover_color="#5a5a5a", command=self.move_down)
         btn_down.pack(side="left", padx=5)
 
-        # Nút Xóa
-        btn_clear = ctk.CTkButton(frame_controls, text="Xóa hết", width=80, fg_color="#a83232", hover_color="#7a2121", command=self.clear_images)
-        btn_clear.pack(side="left", padx=5)
+        btn_clear = ctk.CTkButton(frame_controls, text=self.t("clear"), width=90, height=40, corner_radius=10, font=self.font_bold, fg_color="#a83232", hover_color="#7a2121", command=self.clear_images)
+        btn_clear.pack(side="right", padx=5)
 
-        # --- TÙY CHỌN NÉN VÀ FILTER ---
-        self.compress_var = ctk.BooleanVar(value=True) # Mặc định bật nén
+        self.compress_var = ctk.BooleanVar(value=True) 
         self.enhance_var = ctk.BooleanVar(value=False)
         
         frame_options = ctk.CTkFrame(self.merge_window, fg_color="transparent")
         frame_options.pack(pady=(0, 5), padx=20, fill="x")
         
-        chk_compress = ctk.CTkCheckBox(frame_options, text="🗜️ Nén giảm dung lượng", variable=self.compress_var)
+        chk_compress = ctk.CTkCheckBox(frame_options, text=self.t("compress"), variable=self.compress_var, font=self.font_bold)
         chk_compress.pack(side="left", padx=5)
         
-        chk_enhance = ctk.CTkCheckBox(frame_options, text="✨ Làm sáng & Rõ chữ (Filter)", variable=self.enhance_var)
+        chk_enhance = ctk.CTkCheckBox(frame_options, text=self.t("enhance"), variable=self.enhance_var, font=self.font_bold)
         chk_enhance.pack(side="left", padx=20)
-        # ------------------------------
 
-        # Sử dụng Listbox của tkinter thay vì Textbox để có thể click chọn dòng
-        list_frame = tk.Frame(self.merge_window, bg="#343638")
+        list_frame = tk.Frame(self.merge_window, bg="#343638", bd=0, highlightthickness=0)
         list_frame.pack(pady=10, padx=20, fill="both", expand=True)
         
         scrollbar = tk.Scrollbar(list_frame)
         scrollbar.pack(side="right", fill="y")
         
-        # Style Listbox cho giống Dark Mode
-        self.img_listbox = tk.Listbox(list_frame, font=("Consolas", 12), bg="#2b2b2b", fg="#ffffff", 
+        self.img_listbox = tk.Listbox(list_frame, font=("Consolas", 14), bg="#2b2b2b", fg="#ffffff", 
                                       selectbackground="#1f538d", highlightthickness=0, borderwidth=0,
                                       yscrollcommand=scrollbar.set)
         self.img_listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=self.img_listbox.yview)
 
-        btn_export = ctk.CTkButton(self.merge_window, text="XUẤT RA PDF", font=("Arial", 14, "bold"), fg_color="#2b7a4b", command=self.export_to_pdf)
-        btn_export.pack(pady=10)
+        btn_export = ctk.CTkButton(self.merge_window, text=self.t("export_pdf"), font=self.font_large, height=50, corner_radius=12, fg_color="#2b7a4b", hover_color="#1e5c37", command=self.export_to_pdf)
+        btn_export.pack(pady=15)
 
     def add_images(self):
         paths = filedialog.askopenfilenames(filetypes=[("Image Files", "*.png *.jpg *.jpeg *.bmp *.heic *.heif")])
@@ -629,9 +866,9 @@ class PDFOCRApp(ctk.CTk):
             if idx > 0:
                 self.selected_images_list[idx-1], self.selected_images_list[idx] = self.selected_images_list[idx], self.selected_images_list[idx-1]
                 self.update_image_listbox()
-                self.img_listbox.select_set(idx-1) # Giữ trạng thái bôi đen
+                self.img_listbox.select_set(idx-1) 
         except IndexError:
-            pass # Chưa chọn dòng nào thì bỏ qua
+            pass 
 
     def move_down(self):
         try:
@@ -639,7 +876,7 @@ class PDFOCRApp(ctk.CTk):
             if idx < len(self.selected_images_list) - 1:
                 self.selected_images_list[idx+1], self.selected_images_list[idx] = self.selected_images_list[idx], self.selected_images_list[idx+1]
                 self.update_image_listbox()
-                self.img_listbox.select_set(idx+1) # Giữ trạng thái bôi đen
+                self.img_listbox.select_set(idx+1) 
         except IndexError:
             pass
 
@@ -658,133 +895,102 @@ class PDFOCRApp(ctk.CTk):
         
         if save_path:
             self.img_listbox.delete(0, 'end')
-            self.img_listbox.insert('end', "Đang xử lý ảnh, vui lòng đợi...")
-            self.merge_window.update() # Ép giao diện cập nhật dòng chữ ngay lập tức
+            self.img_listbox.insert('end', self.t("exporting"))
+            self.merge_window.update() 
             
             try:
                 processed_imgs = []
                 for p in self.selected_images_list:
-                    # Mở và chuyển đổi sang RGB
                     img = Image.open(p).convert('RGB')
-                    
-                    # 1. FILTER LÀM RÕ CHỮ (Giống chức năng Scan tài liệu)
                     if self.enhance_var.get():
-                        # Tăng độ tương phản lên 50% (làm nền trắng hơn, chữ đen hơn)
                         enhancer_contrast = ImageEnhance.Contrast(img)
                         img = enhancer_contrast.enhance(1.5)
-                        
-                        # Tăng độ sắc nét lên 100% (giúp nét chữ không bị mờ nhòe)
                         enhancer_sharpness = ImageEnhance.Sharpness(img)
                         img = enhancer_sharpness.enhance(2.0)
-                        
-                        # Tăng độ sáng nhẹ (10%) để khắc phục ảnh chụp thiếu sáng
                         enhancer_brightness = ImageEnhance.Brightness(img)
                         img = enhancer_brightness.enhance(1.1)
 
-                    # 2. NÉN ẢNH GIẢM DUNG LƯỢNG
                     if self.compress_var.get():
-                        # Giới hạn chiều ngang tối đa của ảnh là 1200 pixel (chuẩn xem trên màn hình và in A4)
                         max_width = 1200
                         if img.width > max_width:
-                            # Tính toán tỷ lệ để bóp nhỏ ảnh mà không bị méo
                             ratio = max_width / img.width
                             new_size = (max_width, int(img.height * ratio))
-                            # Dùng thuật toán LANCZOS để giữ nguyên chất lượng cao nhất khi bóp nhỏ
                             img = img.resize(new_size, Image.Resampling.LANCZOS)
                             
                     processed_imgs.append(img)
                 
-                # Lưu tất cả các ảnh đã qua xử lý vào chung 1 file PDF
                 processed_imgs[0].save(save_path, save_all=True, append_images=processed_imgs[1:])
                 
                 self.img_listbox.delete(0, 'end')
-                self.img_listbox.insert('end', f"--- THÀNH CÔNG ---")
-                self.img_listbox.insert('end', f"Đã lưu PDF: {save_path}")
+                self.img_listbox.insert('end', self.t("merge_success", save_path))
                 
             except Exception as e: 
                 self.img_listbox.delete(0, 'end')
-                self.img_listbox.insert('end', f"[!] LỖI: {e}")
+                self.img_listbox.insert('end', self.t("merge_err", e))
 
-    # --- TÍNH NĂNG ĐỒNG HỒ ĐẾM GIỜ ---
     def update_timer_ui(self):
         if self.timer_running and self.start_time:
             delta = datetime.now() - self.start_time
             minutes, seconds = divmod(int(delta.total_seconds()), 60)
-            self.lbl_timer.configure(text=f"Thời gian xử lý: {minutes:02d}:{seconds:02d}")
-            # Cập nhật mỗi giây một lần
+            self.lbl_timer.configure(text=self.t("timer", minutes, seconds))
             self.after(1000, self.update_timer_ui)
 
-    # --- TÍNH NĂNG KIỂM TRA CẬP NHẬT TỪ GITHUB API ---
     def check_for_updates(self):
-        """Hàm chạy ngầm kiểm tra Release mới nhất từ GitHub API"""
         try:
-            # Gửi yêu cầu lên GitHub API (GitHub yêu cầu phải có User-Agent)
             req = urllib.request.Request(GITHUB_API_URL, headers={'User-Agent': 'PDFScan2Word-App'})
             with urllib.request.urlopen(req, timeout=5) as response:
-                # Đọc dữ liệu JSON trả về
                 data = json.loads(response.read().decode('utf-8'))
-                
-                # Lấy tên của tag mới nhất (ví dụ: "v1.1.2")
                 latest_tag = data.get('tag_name', '')
-                
-                # Cắt bỏ chữ 'v' ở đầu để lấy con số thuần túy (thành "1.1.2")
                 latest_version = latest_tag.lstrip('v')
 
-            # So sánh phiên bản (Chuỗi text "1.1.2" > "1.1.1")
             if latest_version > CURRENT_VERSION:
                 self.after(500, self.show_update_popup, latest_version)
         except Exception as e:
             print(f"[!] Không thể kiểm tra cập nhật: {e}")
 
     def show_update_popup(self, latest_version):
-        """Hiển thị cửa sổ thông báo khi có bản mới"""
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Thông báo Cập nhật")
-        dialog.geometry("400x200")
+        dialog.title(self.t("update_title"))
+        dialog.geometry("420x220")
         dialog.attributes("-topmost", True)
         dialog.grab_set()
         
-        lbl = ctk.CTkLabel(dialog, text=f"Có phiên bản mới: v{latest_version}\nPhiên bản hiện tại: v{CURRENT_VERSION}\n\nBạn có muốn tải bản cập nhật về không?", font=("Arial", 14))
+        lbl = ctk.CTkLabel(dialog, text=self.t("update_msg", latest_version, CURRENT_VERSION), font=self.font_main)
         lbl.pack(pady=30)
         
         btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
         btn_frame.pack(pady=10)
         
-        # Nút Tải ngay sẽ mở trình duyệt và đóng popup
-        btn_yes = ctk.CTkButton(btn_frame, text="Tải ngay", fg_color="#2b7a4b", hover_color="#1e5c37", 
+        btn_yes = ctk.CTkButton(btn_frame, text=self.t("btn_yes"), fg_color="#2b7a4b", hover_color="#1e5c37", 
+                                font=self.font_bold, height=40, corner_radius=8,
                                 command=lambda: [webbrowser.open(RELEASES_URL), dialog.destroy()])
         btn_yes.pack(side="left", padx=10)
         
-        btn_no = ctk.CTkButton(btn_frame, text="Bỏ qua", fg_color="gray", hover_color="darkgray", command=dialog.destroy)
+        btn_no = ctk.CTkButton(btn_frame, text=self.t("btn_no"), fg_color="gray", hover_color="darkgray", 
+                               font=self.font_bold, height=40, corner_radius=8, command=dialog.destroy)
         btn_no.pack(side="left", padx=10)
 
     def show_about_popup(self, event=None):
-        """Hiển thị cửa sổ About chuẩn phong cách macOS"""
         about_window = ctk.CTkToplevel(self)
         about_window.title("")
-        about_window.geometry("280x320")
+        about_window.geometry("340x360")
         about_window.resizable(False, False)
         about_window.attributes("-topmost", True)
         about_window.grab_set()
 
-        # Logo
-        lbl_logo = ctk.CTkLabel(about_window, text="📄", font=("Arial", 60))
+        lbl_logo = ctk.CTkLabel(about_window, text="📄", font=("Segoe UI", 60))
         lbl_logo.pack(pady=(20, 10))
 
-        # Tên ứng dụng
-        lbl_name = ctk.CTkLabel(about_window, text="Công cụ chuyển \n Ảnh sang Word", font=("Arial", 20, "bold"))
+        lbl_name = ctk.CTkLabel(about_window, text=self.t("title"), font=("Segoe UI", 20, "bold"))
         lbl_name.pack(pady=(0, 5))
 
-        # Phiên bản và Build
-        lbl_ver = ctk.CTkLabel(about_window, text=f"Phiên bản {CURRENT_VERSION} ({self.build_str})", font=("Arial", 12), text_color="gray50")
+        lbl_ver = ctk.CTkLabel(about_window, text=f"Version {CURRENT_VERSION} ({self.build_str})", font=("Segoe UI", 12), text_color="gray50")
         lbl_ver.pack(pady=(0, 15))
 
-        # Bản quyền
-        lbl_copyright = ctk.CTkLabel(about_window, text=f"Cảm ơn bạn hiền đã sử dụng ứng dụng này <3", font=("Arial", 12))
+        lbl_copyright = ctk.CTkLabel(about_window, text="Thank you for using this app! ❤️\nCảm ơn bạn hiền đã sử dụng ứng dụng này!", font=("Segoe UI", 13))
         lbl_copyright.pack(pady=(0, 20))
 
-        # Nút Link Github
-        lbl_link = ctk.CTkLabel(about_window, text="Developed by @tozn607", text_color="#1f6aa5", font=("Arial", 12, "bold", "underline"), cursor="hand2")
+        lbl_link = ctk.CTkLabel(about_window, text="Developed by @tozn607", text_color="#1f6aa5", font=("Segoe UI", 13, "bold", "underline"), cursor="hand2")
         lbl_link.pack(pady=(0, 20))
         lbl_link.bind("<Button-1>", lambda e: webbrowser.open("https://github.com/tozn607"))
 
