@@ -65,7 +65,7 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         cd dist
-        zip -r ../PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip PDFScan2Word.app
+        zip -yr ../PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip PDFScan2Word.app
       shell: bash
 
     - name: Lưu file ZIP vào Artifacts
