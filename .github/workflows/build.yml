@@ -26,32 +26,33 @@ jobs:
         include:
           - os: windows-latest
             suffix: Windows
+            enabled: ${{ inputs.build_windows }}
           - os: macos-15-intel
             suffix: macOS-x86_64
+            enabled: ${{ inputs.build_macos_x86 }}
           - os: macos-15
             suffix: macOS-arm64
+            enabled: ${{ inputs.build_macos_arm }}
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
-    
-    if: >
-      (matrix.os == 'windows-latest' && inputs.build_windows == true) ||
-      (matrix.os == 'macos-15-intel' && inputs.build_macos_x86 == true) ||
-      (matrix.os == 'macos-15' && inputs.build_macos_arm == true)
     
     permissions:
       contents: write
 
     steps:
     - name: Lấy mã nguồn về máy chủ
+      if: matrix.enabled
       uses: actions/checkout@v4
 
     - name: Cài đặt Python 3.10
+      if: matrix.enabled
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
     - name: Cài đặt thư viện Python
+      if: matrix.enabled
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
@@ -59,35 +60,37 @@ jobs:
 
     - name: Trích xuất Phiên bản từ main.py
       id: extract_version
+      if: matrix.enabled
       run: |
         VERSION=$(python -c "import re; print(re.search(r'CURRENT_VERSION\s*=\s*[\"\'\']([^\"\'\']+)[\"\'\']', open('main.py', encoding='utf-8').read()).group(1))")
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
       shell: bash
 
     - name: Đóng gói thành file chạy bằng PyInstaller (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.enabled && runner.os == 'Windows'
       run: |
         pyinstaller --noconsole --onefile --name PDFScan2Word main.py
         
     - name: Đóng gói thành file chạy bằng PyInstaller (macOS)
-      if: runner.os == 'macOS'
+      if: matrix.enabled && runner.os == 'macOS'
       run: |
         pyinstaller --noconsole --windowed --name PDFScan2Word main.py
         
     - name: Nén thành ZIP (Windows)
-      if: runner.os == 'Windows'
+      if: matrix.enabled && runner.os == 'Windows'
       run: |
         Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
       shell: powershell
 
     - name: Nén thành ZIP (macOS)
-      if: runner.os == 'macOS'
+      if: matrix.enabled && runner.os == 'macOS'
       run: |
         cd dist
         zip -yr ../PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip PDFScan2Word.app
       shell: bash
 
     - name: Lưu file ZIP vào Artifacts
+      if: matrix.enabled
       uses: actions/upload-artifact@v4
       with:
         name: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}
