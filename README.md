@@ -2,7 +2,7 @@
 
 # 📄 PDFScan2Word (v2.0.0)
 
-**[🇺🇸 English](#-english) • [🇻🇳 Tiếng Việt](#-tiếng-việt)**
+**[🇻🇳 Tiếng Việt](#-tiếng-việt) • [🇺🇸 English](#-english)**
 
 ![GitHub release](https://img.shields.io/github/v/release/tozn607/pdfscan2word?color=success)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
@@ -10,7 +10,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into fully formatted Word (`.docx`) documents.  
-*Một ứng dụng Desktop sức mạnh AI giúp số hóa PDF & Ảnh quét thành tài liệu Word (.docx) giữ nguyên định dạng.*
+*Ứng dụng Desktop tích hợp AI giúp chuyển đổi PDF và ảnh quét sang tài liệu Word (.docx) giữ nguyên định dạng.*
 
 <img src="readme/1.png" alt="Main Interface" width="700"/>
 
@@ -18,11 +18,56 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 
 ---
 
+## 🇻🇳 Tiếng Việt
+
+### 🚀 Có gì mới trong bản v2.0.0?
+Phiên bản này mang lại những nâng cấp quan trọng và toàn diện:
+- **Loại bỏ phụ thuộc hệ thống:** Chuyển sang sử dụng `PyMuPDF`, hoàn toàn không cần cài đặt Poppler. Pandoc được tự động tích hợp, giúp đơn giản hóa quy trình thiết lập cho người dùng.
+- **Giao diện hiện đại:** Thiết kế mới theo phong cách thẻ (card-based), hỗ trợ Native Dark Mode và tối ưu hóa trải nghiệm người dùng.
+- **Hỗ trợ đa ngôn ngữ:** Giao diện hoàn thiện bằng cả tiếng Anh và tiếng Việt, bao gồm trình chọn ngôn ngữ trong lần đầu sử dụng.
+- **Giải bài tập bằng AI:** Tính năng mới tự động nhận diện các câu hỏi/bài tập trong tài liệu scan và cung cấp lời giải chi tiết đính kèm cuối văn bản.
+- **Bản build đóng gói sẵn:** Cung cấp file chạy trực tiếp cho Windows và macOS (cả chip Apple Silicon và Intel) mà không cần cài đặt môi trường Python.
+
+### ✨ Tính năng nổi bật
+- **Bảo toàn định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách, định dạng chữ đậm/nghiêng trực tiếp qua PyPandoc.
+- **Khôi phục văn bản thông minh:** Sử dụng Gemini 3.1 Flash để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
+- **Xử lý hàng loạt:** Chuyển đổi toàn bộ thư mục PDF chỉ với một thao tác duy nhất.
+- **Công cụ tạo PDF từ ảnh:** Tích hợp tiện ích gộp, nén và tối ưu hóa các định dạng `.heic`, `.jpg`, `.png` thành một file PDF duy nhất.
+- **Xử lý trang đôi:** Tự động nhận diện và cắt đôi các bản quét sách định dạng A5 (hai trang trên một mặt scan).
+
+### ⚙️ Hướng dẫn cài đặt (Khuyên dùng)
+Người dùng thông thường có thể sử dụng ứng dụng ngay mà không cần cài đặt môi trường lập trình:
+
+1. Truy cập trang [Releases](https://github.com/tozn607/pdfscan2word/releases).
+2. Tải về phiên bản tương ứng với hệ điều hành:
+   - **Windows:** Tải file `.exe` hoặc bản nén `.zip`.
+   - **macOS:** Tải bản `.zip` dành cho `Apple Silicon (arm64)` hoặc `Intel (x86_64)`.
+3. Giải nén và khởi chạy ứng dụng.
+> **Lưu ý cho macOS:** Trong trường hợp hệ thống báo lỗi "app is damaged", vui lòng mở Terminal và chạy lệnh: `xattr -cr /đường-dẫn-đến/PDFScan2Word.app`
+
+### 💻 Chạy từ mã nguồn
+Dành cho lập trình viên muốn tùy chỉnh hoặc phát triển thêm:
+```bash
+git clone https://github.com/tozn607/pdfscan2word.git
+cd pdfscan2word
+pip install -r requirements.txt
+python main.py
+```
+
+### 💡 Hướng dẫn sử dụng
+1. Đăng ký API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/).
+2. Khởi động ứng dụng và chọn ngôn ngữ ưu tiên.
+3. Nhập API Key vào ô cấu hình (Key sẽ được lưu tự động cho các lần sau).
+4. Chọn chế độ **Single Mode** (xử lý 1 file) hoặc **Batch Mode** (xử lý cả thư mục).
+5. Chọn file/thư mục đầu vào và nhấn **START PROCESSING**. Kết quả sẽ được tự động lưu dưới định dạng `.docx`.
+
+---
+
 ## 🇺🇸 English
 
 ### 🚀 What's New in v2.0.0?
 This major update brings a complete overhaul to the application:
-- **No System Dependencies Required:** We completely replaced `pdf2image` with `PyMuPDF`, meaning **Poppler is no longer required**! Pandoc is also automatically fetched if not detected.
+- **No System Dependencies Required:** We completely replaced `pdf2image` with `PyMuPDF`, meaning Poppler is no longer required! Pandoc is also automatically fetched if not detected.
 - **Modernized UI:** A brand new, sleek, card-based interface with native Dark Mode support and responsive design.
 - **Bilingual Support:** Full English & Vietnamese UI, featuring a first-time setup language selector.
 - **AI Exercise Solver:** A brand new option that automatically detects exercises in the scan and appends fully mathematical/worked-out solutions!
@@ -43,7 +88,7 @@ You don't need to know Python to use this app. Just download the pre-built appli
    - **Windows:** Download the `.exe` or `.zip` for Windows.
    - **macOS:** Download the `.zip` for `Apple Silicon (arm64)` or `Intel (x86_64)`.
 3. Extract and run!
-> **🍎 macOS Quarantine Note:** If macOS prevents the app from opening by saying "app is damaged", open Terminal and run: `xattr -cr /path/to/extracted/PDFScan2Word.app`
+> **macOS Quarantine Note:** If macOS prevents the app from opening by saying "app is damaged", open Terminal and run: `xattr -cr /path/to/extracted/PDFScan2Word.app`
 
 ### 💻 Running from Source
 If you are a developer and want to run it from the code:
@@ -63,55 +108,11 @@ python main.py
 
 ---
 
-## 🇻🇳 Tiếng Việt
-
-### 🚀 Có gì mới trong bản v2.0.0?
-Phiên bản này mang đến đợt nâng cấp toàn diện nhất từ trước tới nay:
-- **Không Cần Cài Thư Viện Hệ Thống:** Loại bỏ hoàn toàn sự phụ thuộc vào Poppler nhờ chuyển sang dùng `PyMuPDF`. Pandoc cũng được tự động tải về. Người dùng không cực nhọc cài đặt nữa!
-- **Giao Diện Hiện Đại:** Lột xác hoàn toàn với giao diện thẻ (card-based), phông chữ to rõ trang nhã và Native Dark Mode.
-- **Đa Ngôn Ngữ:** Hỗ trợ song ngữ Anh/Việt từ đầu tới cuối ứng dụng.
-- **AI Giải Bài Tập:** Tính năng mới cho phép AI tự động nhận diện bài tập trong sách và làm bài giải chi tiết đính kèm cuối file Word!
-- **Đóng Gói Đa Nền Tảng:** Hỗ trợ file chạy trực tiếp không cần cài Python trên Windows, macOS (Apple Silicon M1/M2/M3) và macOS (Intel).
-
-### ✨ Tính năng Nổi bật
-- **Bảo toàn Định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách list, in đậm/nghiêng trực tiếp.
-- **Phục hồi Văn bản:** Có khả năng điền bù chữ bị tối hoặc gấp nếp sát mép gáy quyển giáo trình thật.
-- **Xử lý Hàng loạt:** Quét hàng chục file PDF trong thư mục cùng lúc.
-- **Gộp & Tối ưu Ảnh:** Tiện ích nhỏ giúp bạn ghép các file hình rời rạc (.heic, .jpg) thành 1 file PDF để chuẩn bị xử lý.
-- **Xử lý Trang Đôi:** Nhận diện sách A5 được scan với 2 trang mỗi khung hình.
-
-### ⚙️ Cài đặt Siêu Dễ (Khuyên dùng)
-Bạn không cần biết code để xài, chỉ cần tải về nhấp đúp là chạy:
-
-1. Tới trang [Releases](https://github.com/tozn607/pdfscan2word/releases).
-2. Tải phiên bản phù hợp với hệ điều hành:
-   - **Lưu ý Windows:** Tải file `.exe` hoạt động dạng Portable hoặc giải nén file `.zip`.
-   - **Lưu ý macOS:** Tải bản `.zip` cho tương ứng dòng máy Apple Silicon (arm64) hoặc chip Intel (x86_64).
-3. Giải nén và tận hưởng!
-> **🍎 Khắc phục lỗi macOS:** Với lần đầu, nếu hệ thống báo "Ứng dụng bị hỏng (App is damaged)", hãy mở ứng dụng Terminal và gõ: `xattr -cr /đường-dẫn-tới/PDFScan2Word.app`
-
-### 💻 Chạy trên Môi trường Python (Source)
-```bash
-git clone https://github.com/tozn607/pdfscan2word.git
-cd pdfscan2word
-pip install -r requirements.txt
-python main.py
-```
-
-### 💡 Hướng dẫn Sử dụng Thao tác
-1. Tạo một API Key miễn phí từ [Google AI Studio](https://aistudio.google.com/).
-2. Mở ứng dụng lên, cài đặt ngôn ngữ ban đầu là Tiếng Việt.
-3. Dán API key vào mục yêu cầu (Key sẽ tự lưu cho các lần sau).
-4. Chọn chế độ **1 File PDF** hoặc **Thư Mục Hàng Loạt**.
-5. Chọn đường dẫn file và bấm **BẮT ĐẦU XỬ LÝ**. Thưởng thức thành quả lưu ở đầu ra `.docx`.
-
----
-
 ### ❤️ Credits
-- Cốt lõi giao diện: [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
-- Hệ thần kinh số: [Google Generative AI (Gemini)](https://ai.google.dev/)
-- Xử lý biên dịch Format: [Pandoc](https://pandoc.org/)
-- Nền tảng PDF: [PyMuPDF](https://pymupdf.readthedocs.io/)
+- UI Framework: [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
+- AI Engine: [Google Generative AI (Gemini)](https://ai.google.dev/)
+- Formatting Engine: [Pandoc](https://pandoc.org/)
+- PDF Backend: [PyMuPDF](https://pymupdf.readthedocs.io/)
 
 ### 📜 Giấy phép (License)
-Dự án open-source hoàn toàn 100% dưới giấy phép [MIT License](LICENSE).
+Dự án được phát hành dưới giấy phép mã nguồn mở [MIT License](LICENSE).
