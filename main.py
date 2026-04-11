@@ -763,7 +763,8 @@ class PDFOCRApp(QMainWindow):
         self.timer_running = False
 
         self.setWindowTitle(self.t("title") + " v" + CURRENT_VERSION)
-        self.setMinimumSize(840, 880)
+        self.setMinimumSize(600, 500)
+        self.resize(840, 750)
         self.setStyleSheet(QSS)
         
         self.timer = QTimer(self)
