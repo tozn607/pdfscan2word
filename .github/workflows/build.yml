@@ -1,9 +1,23 @@
-name: Build and Upload to Release
+name: Build and Upload Artifacts
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      build_windows:
+        description: 'Build for Windows'
+        type: boolean
+        required: true
+        default: true
+      build_macos_x86:
+        description: 'Build for macOS (x86_64)'
+        type: boolean
+        required: true
+        default: true
+      build_macos_arm:
+        description: 'Build for macOS (arm64)'
+        type: boolean
+        required: true
+        default: true
 
 jobs:
   build-and-upload:
@@ -19,6 +33,11 @@ jobs:
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
+    
+    if: >
+      (matrix.os == 'windows-latest' && inputs.build_windows == true) ||
+      (matrix.os == 'macos-15-intel' && inputs.build_macos_x86 == true) ||
+      (matrix.os == 'macos-15' && inputs.build_macos_arm == true)
     
     permissions:
       contents: write
@@ -73,13 +92,3 @@ jobs:
       with:
         name: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}
         path: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
-        
-    - name: Đính kèm file ZIP vào bài Release mới nhất
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        LATEST_TAG=$(gh release view --json tagName -q .tagName)
-        echo "Đang upload vào Release: $LATEST_TAG"
-        
-        gh release upload $LATEST_TAG PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip --clobber
-      shell: bash
