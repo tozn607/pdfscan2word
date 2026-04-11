@@ -710,8 +710,12 @@ class DownloadUpdateThread(QThread):
             
             self.log_signal.emit("Tải xong! Đang giải nén...")
             
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(temp_dir)
+            if sys.platform == "darwin":
+                import subprocess
+                subprocess.run(["unzip", "-q", "-o", zip_path, "-d", temp_dir], check=True)
+            else:
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
                 
             self.log_signal.emit("Sẵn sàng cài đặt...")
             self.finished_signal.emit(temp_dir, "")
@@ -1220,6 +1224,7 @@ del "%~f0"
 sleep 2
 rm -rf "{target_path}"
 mv "{new_app_path}" "{target_path}"
+xattr -cr "{target_path}" 2>/dev/null
 open "{target_path}"
 rm "$0"
 ''')
