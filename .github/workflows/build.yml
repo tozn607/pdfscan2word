@@ -20,19 +20,36 @@ on:
         default: true
 
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      run_any: ${{ steps.set-matrix.outputs.run_any }}
+    steps:
+      - id: set-matrix
+        run: |
+          MATRIX="[]"
+          RUN_ANY="false"
+          if [ "${{ inputs.build_windows }}" == "true" ]; then 
+            MATRIX=$(echo $MATRIX | jq '. += [{"os": "windows-latest", "suffix": "Windows"}]')
+            RUN_ANY="true"
+          fi
+          if [ "${{ inputs.build_macos_x86 }}" == "true" ]; then 
+            MATRIX=$(echo $MATRIX | jq '. += [{"os": "macos-15-intel", "suffix": "macOS-x86_64"}]')
+            RUN_ANY="true"
+          fi
+          if [ "${{ inputs.build_macos_arm }}" == "true" ]; then 
+            MATRIX=$(echo $MATRIX | jq '. += [{"os": "macos-15", "suffix": "macOS-arm64"}]')
+            RUN_ANY="true"
+          fi
+          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+          echo "run_any=$RUN_ANY" >> $GITHUB_OUTPUT
+
   build-and-upload:
+    needs: prepare-matrix
+    if: needs.prepare-matrix.outputs.run_any == 'true'
     strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            suffix: Windows
-            enabled: ${{ inputs.build_windows }}
-          - os: macos-15-intel
-            suffix: macOS-x86_64
-            enabled: ${{ inputs.build_macos_x86 }}
-          - os: macos-15
-            suffix: macOS-arm64
-            enabled: ${{ inputs.build_macos_arm }}
+      matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -42,17 +59,14 @@ jobs:
 
     steps:
     - name: Lấy mã nguồn về máy chủ
-      if: matrix.enabled
       uses: actions/checkout@v4
 
     - name: Cài đặt Python 3.10
-      if: matrix.enabled
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
     - name: Cài đặt thư viện Python
-      if: matrix.enabled
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
@@ -60,37 +74,35 @@ jobs:
 
     - name: Trích xuất Phiên bản từ main.py
       id: extract_version
-      if: matrix.enabled
       run: |
         VERSION=$(python -c "import re; print(re.search(r'CURRENT_VERSION\s*=\s*[\"\'\']([^\"\'\']+)[\"\'\']', open('main.py', encoding='utf-8').read()).group(1))")
         echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
       shell: bash
 
     - name: Đóng gói thành file chạy bằng PyInstaller (Windows)
-      if: matrix.enabled && runner.os == 'Windows'
+      if: runner.os == 'Windows'
       run: |
         pyinstaller --noconsole --onefile --name PDFScan2Word main.py
         
     - name: Đóng gói thành file chạy bằng PyInstaller (macOS)
-      if: matrix.enabled && runner.os == 'macOS'
+      if: runner.os == 'macOS'
       run: |
         pyinstaller --noconsole --windowed --name PDFScan2Word main.py
         
     - name: Nén thành ZIP (Windows)
-      if: matrix.enabled && runner.os == 'Windows'
+      if: runner.os == 'Windows'
       run: |
         Compress-Archive -Path dist\PDFScan2Word.exe -DestinationPath PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
       shell: powershell
 
     - name: Nén thành ZIP (macOS)
-      if: matrix.enabled && runner.os == 'macOS'
+      if: runner.os == 'macOS'
       run: |
         cd dist
         zip -yr ../PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip PDFScan2Word.app
       shell: bash
 
     - name: Lưu file ZIP vào Artifacts
-      if: matrix.enabled
       uses: actions/upload-artifact@v4
       with:
         name: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}
