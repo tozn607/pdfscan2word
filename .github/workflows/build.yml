@@ -31,15 +31,15 @@ jobs:
           MATRIX="[]"
           RUN_ANY="false"
           if [ "${{ inputs.build_windows }}" == "true" ]; then 
-            MATRIX=$(echo $MATRIX | jq '. += [{"os": "windows-latest", "suffix": "Windows"}]')
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "windows-latest", "suffix": "Windows"}]')
             RUN_ANY="true"
           fi
           if [ "${{ inputs.build_macos_x86 }}" == "true" ]; then 
-            MATRIX=$(echo $MATRIX | jq '. += [{"os": "macos-15-intel", "suffix": "macOS-x86_64"}]')
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "macos-15-intel", "suffix": "macOS-x86_64"}]')
             RUN_ANY="true"
           fi
           if [ "${{ inputs.build_macos_arm }}" == "true" ]; then 
-            MATRIX=$(echo $MATRIX | jq '. += [{"os": "macos-15", "suffix": "macOS-arm64"}]')
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "macos-15", "suffix": "macOS-arm64"}]')
             RUN_ANY="true"
           fi
           echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
