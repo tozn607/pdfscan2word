@@ -4,6 +4,11 @@ import webbrowser
 import sys
 import time
 import threading
+import subprocess
+import tempfile
+import zipfile
+import stat
+import platform
 import docx
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -256,7 +261,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                              QCheckBox, QComboBox, QTextEdit, QFileDialog, 
                              QMessageBox, QDialog, QButtonGroup, QListWidget, QFrame,
-                             QSizePolicy, QScrollArea, QAbstractItemView)
+                             QSizePolicy, QScrollArea, QAbstractItemView, QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QCursor
 
@@ -670,7 +675,82 @@ class MergeWindow(QDialog):
                 self.listbox.clear()
                 self.listbox.addItem(self.app.t("merge_err", str(e)))
 
+class DownloadUpdateThread(QThread):
+    progress_signal = pyqtSignal(int)
+    log_signal = pyqtSignal(str)
+    finished_signal = pyqtSignal(str, str)
+    
+    def __init__(self, download_url, version):
+        super().__init__()
+        self.download_url = download_url
+        self.version = version
+        
+    def run(self):
+        try:
+            self.log_signal.emit(f"Đang tải bản cập nhật (v{self.version})...")
+            
+            temp_dir = tempfile.mkdtemp(prefix="pdfscan2word_update_")
+            zip_path = os.path.join(temp_dir, "update.zip")
+            
+            req = urllib.request.Request(self.download_url, headers={'User-Agent': 'PDFScan2Word-App'})
+            with urllib.request.urlopen(req) as response:
+                total_size = int(response.info().get("Content-Length", -1))
+                
+                downloaded = 0
+                with open(zip_path, 'wb') as f:
+                    while True:
+                        chunk = response.read(8192)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            percent = int(downloaded * 100 / total_size)
+                            self.progress_signal.emit(percent)
+            
+            self.log_signal.emit("Tải xong! Đang giải nén...")
+            
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+                
+            self.log_signal.emit("Sẵn sàng cài đặt...")
+            self.finished_signal.emit(temp_dir, "")
+        except Exception as e:
+            self.finished_signal.emit("", str(e))
+
+class UpdateProgressDialog(QDialog):
+    def __init__(self, parent=None, download_url="", version=""):
+        super().__init__(parent)
+        self.setWindowTitle("Đang cập nhật...")
+        self.setFixedSize(400, 150)
+        
+        layout = QVBoxLayout(self)
+        
+        self.lbl_status = QLabel("Đang kết nối...", self)
+        layout.addWidget(self.lbl_status)
+        
+        self.progress = QProgressBar(self)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        layout.addWidget(self.progress)
+        
+        self.thread = DownloadUpdateThread(download_url, version)
+        self.thread.progress_signal.connect(self.progress.setValue)
+        self.thread.log_signal.connect(self.lbl_status.setText)
+        self.thread.finished_signal.connect(self.on_download_finished)
+        self.thread.start()
+        
+    def on_download_finished(self, temp_dir, err):
+        if err:
+            QMessageBox.critical(self, "Lỗi cập nhật", f"Không thể tải/giải nén:\\n{err}")
+            self.reject()
+        else:
+            self.parent().perform_update_swap(temp_dir)
+            self.accept()
+
 class PDFOCRApp(QMainWindow):
+    update_available_signal = pyqtSignal(str, str)
+    
     def __init__(self):
         super().__init__()
         self.current_lang = "VN" # Default
@@ -697,6 +777,8 @@ class PDFOCRApp(QMainWindow):
         if not os.path.exists(CONFIG_JSON_FILE):
             QTimer.singleShot(200, self.show_language_popup)
 
+        # Update connection
+        self.update_available_signal.connect(self.prompt_update)
         # Update check threaded
         threading.Thread(target=self.check_for_updates, daemon=True).start()
 
@@ -1055,8 +1137,95 @@ class PDFOCRApp(QMainWindow):
                 data = json.loads(r.read().decode('utf-8'))
                 latest = data.get('tag_name', '').lstrip('v')
             if latest > CURRENT_VERSION:
-                self.write_log(f"\n[*] Cập nhật mới có sẵn: v{latest} - Vui lòng tải tại Github.")
+                if sys.platform == "win32":
+                    suffix = "Windows.zip"
+                elif sys.platform == "darwin":
+                    arch = platform.machine()
+                    if arch == "arm64":
+                        suffix = "macOS-arm64.zip"
+                    else:
+                        suffix = "macOS-x86_64.zip"
+                else:
+                    self.write_log(f"\\n[*] Cập nhật mới có sẵn: v{latest} - Vui lòng tải tại Github.")
+                    return
+                    
+                download_url = ""
+                for asset in data.get('assets', []):
+                    if asset.get('name', '').endswith(suffix):
+                        download_url = asset.get('browser_download_url', '')
+                        break
+                        
+                if download_url:
+                    self.update_available_signal.emit(latest, download_url)
+                else:
+                    self.write_log(f"\\n[*] Cập nhật mới có sẵn: v{latest} - Vui lòng tải tại Github.")
         except: pass
+
+    def prompt_update(self, latest, download_url):
+        title = self.t("update_title")
+        msg = self.t("update_msg", latest, CURRENT_VERSION)
+        
+        box = QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setText(msg)
+        box.setIcon(QMessageBox.Icon.Information)
+        btn_yes = box.addButton(self.t("btn_yes"), QMessageBox.ButtonRole.AcceptRole)
+        btn_no = box.addButton(self.t("btn_no"), QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        
+        if box.clickedButton() == btn_yes:
+            dlg = UpdateProgressDialog(self, download_url, latest)
+            dlg.exec()
+
+    def perform_update_swap(self, temp_dir):
+        if not getattr(sys, 'frozen', False):
+            QMessageBox.warning(self, "Lỗi", "Tính năng tự động cập nhật chỉ hoạt động trong bản release (.exe/.app).\\nVui lòng cập nhật mã nguồn bằng Git.")
+            return
+
+        current_exe = sys.executable
+        if sys.platform == "darwin":
+            app_path = os.path.dirname(os.path.dirname(os.path.dirname(current_exe)))
+            if app_path.endswith('.app'):
+                target_path = app_path
+            else:
+                target_path = current_exe
+        else:
+            target_path = current_exe
+            
+        new_app_path = None
+        for item in os.listdir(temp_dir):
+            if item.endswith(".app") or item.endswith(".exe"):
+                new_app_path = os.path.join(temp_dir, item)
+                break
+                
+        if not new_app_path:
+            QMessageBox.critical(self, "Lỗi cập nhật", "Không tìm thấy file chạy (.exe/.app) trong file tải về!")
+            return
+            
+        if sys.platform == "win32":
+            script_path = os.path.join(temp_dir, "update.bat")
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(f'''@echo off
+timeout /t 2 /nobreak > NUL
+move /y "{new_app_path}" "{target_path}"
+start "" "{target_path}"
+del "%~f0"
+''')
+            subprocess.Popen([script_path], creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            script_path = os.path.join(temp_dir, "update.sh")
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(f'''#!/bin/bash
+sleep 2
+rm -rf "{target_path}"
+mv "{new_app_path}" "{target_path}"
+open "{target_path}"
+rm "$0"
+''')
+            os.chmod(script_path, stat.S_IRWXU)
+            subprocess.Popen([script_path])
+            
+        QApplication.quit()
 
     def open_merge_popup(self):
         self.merge_window = MergeWindow(self)
