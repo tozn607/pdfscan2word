@@ -12,10 +12,19 @@ from docx.shared import Pt, Cm
 from datetime import datetime
 import json
 from PIL import Image, ImageEnhance
+import ssl
 
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
     os.environ["PATH"] += os.pathsep + "/usr/local/bin" + os.pathsep + "/opt/homebrew/bin"
+
+# --- MACOS SSL CERT FIX ---
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 # --------------------------------------------------------
 
 import fitz 
