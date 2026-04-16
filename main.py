@@ -179,6 +179,9 @@ STRINGS = {
         "log_net_error": "      [!] Lỗi kết nối (Thử lại sau 5 giây): {0}",
         "status_retrying": "Lỗi mạng - Đang thử lại...",
         "btn_unfinished": "📋 CHƯA HOÀN THÀNH",
+        "btn_delete": "Xóa bản lưu",
+        "btn_up": "Di chuyển lên",
+        "btn_down": "Di chuyển xuống",
         "history_title": "Danh sách tiến trình chưa xong",
         "resume_title": "Tiếp tục tiến trình",
         "resume_query": "Tìm thấy bản nháp của file này từ trước. Bạn có muốn tiếp tục từ trang {0} không?",
@@ -252,6 +255,9 @@ STRINGS = {
         "log_net_error": "      [!] Connection Error (Retrying in 5s): {0}",
         "status_retrying": "Net Error - Retrying...",
         "btn_unfinished": "📋 UNFINISHED",
+        "btn_delete": "Delete Draft",
+        "btn_up": "Move Up",
+        "btn_down": "Move Down",
         "history_title": "Unfinished Tasks List",
         "resume_title": "Resume Process",
         "resume_query": "A previous draft for this file was found. Do you want to resume from page {0}?",
@@ -405,37 +411,112 @@ class CheckpointHistoryDialog(QDialog):
         super().__init__(parent)
         self.app = parent
         self.setWindowTitle(self.app.t("history_title"))
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(750, 450)
         self.setStyleSheet(QSS)
         
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        
+        # Nội dung chính gồm List và Sidebar
+        content_layout = QHBoxLayout()
+        
         self.listbox = QListWidget()
         self.listbox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.listbox.itemDoubleClicked.connect(self.on_select)
-        layout.addWidget(self.listbox)
+        content_layout.addWidget(self.listbox, 4)
         
+        # Sidebar điều khiển
+        sidebar = QVBoxLayout()
+        self.btn_up = QPushButton(self.app.t("btn_up"))
+        self.btn_up.clicked.connect(self.move_up)
+        
+        self.btn_down = QPushButton(self.app.t("btn_down"))
+        self.btn_down.clicked.connect(self.move_down)
+        
+        self.btn_delete = QPushButton(self.app.t("btn_delete"))
+        self.btn_delete.setStyleSheet("background-color: #a83232; color: white;")
+        self.btn_delete.clicked.connect(self.delete_selected)
+        
+        sidebar.addWidget(self.btn_up)
+        sidebar.addWidget(self.btn_down)
+        sidebar.addStretch()
+        sidebar.addWidget(self.btn_delete)
+        
+        content_layout.addLayout(sidebar, 1)
+        main_layout.addLayout(content_layout)
+        
+        # Nút hành động chính
+        actions = QHBoxLayout()
         self.btn_select = QPushButton("Resume / Tiếp tục")
         self.btn_select.setObjectName("Success")
+        self.btn_select.setMinimumHeight(45)
         self.btn_select.clicked.connect(self.on_select)
-        layout.addWidget(self.btn_select)
+        actions.addWidget(self.btn_select)
+        main_layout.addLayout(actions)
         
         self.checkpoints = []
         self.load_checkpoints()
         
     def load_checkpoints(self):
+        self.listbox.clear()
+        self.checkpoints = []
         if not os.path.exists(CHECKPOINT_DIR): return
-        for f in os.listdir(CHECKPOINT_DIR):
-            if f.endswith(".json"):
-                try:
-                    p = os.path.join(CHECKPOINT_DIR, f)
-                    with open(p, "r", encoding="utf-8") as file:
-                        data = json.load(file)
-                        filename = os.path.basename(data.get("pdf_path", "Unknown"))
-                        page = data.get("current_page", 0)
-                        self.checkpoints.append(data)
-                        self.listbox.addItem(f"{filename} - Page {page} (Draft)")
-                except: pass
+        
+        files = [f for f in os.listdir(CHECKPOINT_DIR) if f.endswith(".json")]
+        # Sắp xếp theo thời gian file modify mặc định
+        files.sort(key=lambda x: os.path.getmtime(os.path.join(CHECKPOINT_DIR, x)), reverse=True)
+        
+        for f in files:
+            try:
+                p = os.path.join(CHECKPOINT_DIR, f)
+                with open(p, "r", encoding="utf-8") as file:
+                    data = json.load(file)
+                    data["_internal_filename"] = f
+                    filename = os.path.basename(data.get("pdf_path", "Unknown"))
+                    page = data.get("current_page", 0)
+                    total = data.get("total_pages", "?")
+                    time_str = data.get("timestamp", "No Date")
+                    
+                    self.checkpoints.append(data)
+                    display_text = f"📄 {filename}\n   ↳ {self.app.t('log_resume', page, total)} | {time_str}"
+                    self.listbox.addItem(display_text)
+            except: pass
                 
+    def move_up(self):
+        row = self.listbox.currentRow()
+        if row > 0:
+            # Swap in memory
+            self.checkpoints[row], self.checkpoints[row-1] = self.checkpoints[row-1], self.checkpoints[row]
+            self.refresh_list()
+            self.listbox.setCurrentRow(row - 1)
+
+    def move_down(self):
+        row = self.listbox.currentRow()
+        if row < self.listbox.count() - 1 and row != -1:
+            self.checkpoints[row], self.checkpoints[row+1] = self.checkpoints[row+1], self.checkpoints[row]
+            self.refresh_list()
+            self.listbox.setCurrentRow(row + 1)
+
+    def delete_selected(self):
+        row = self.listbox.currentRow()
+        if row >= 0:
+            data = self.checkpoints[row]
+            f = data.get("_internal_filename")
+            p = os.path.join(CHECKPOINT_DIR, f)
+            try:
+                if os.path.exists(p): os.remove(p)
+                self.load_checkpoints()
+            except: pass
+
+    def refresh_list(self):
+        self.listbox.clear()
+        for data in self.checkpoints:
+            filename = os.path.basename(data.get("pdf_path", "Unknown"))
+            page = data.get("current_page", 0)
+            total = data.get("total_pages", "?")
+            time_str = data.get("timestamp", "No Date")
+            display_text = f"📄 {filename}\n   ↳ {self.app.t('log_resume', page, total)} | {time_str}"
+            self.listbox.addItem(display_text)
+
     def on_select(self):
         row = self.listbox.currentRow()
         if row >= 0:
@@ -478,12 +559,15 @@ class WorkerThread(QThread):
         pdf_id = hashlib.md5(abs_path.encode('utf-8')).hexdigest()
         return os.path.join(CHECKPOINT_DIR, f"{pdf_id}.json")
 
-    def save_checkpoint(self, pdf_path, page_idx, content):
+    def save_checkpoint(self, pdf_path, page_idx, content, total_pages=0):
         try:
+            import datetime
             cp_path = self.get_checkpoint_path(pdf_path)
             data = {
                 "pdf_path": pdf_path,
                 "current_page": page_idx,
+                "total_pages": total_pages,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "content": content,
                 "options": {
                     "solve": self.app.solve_var,
@@ -665,7 +749,7 @@ class WorkerThread(QThread):
                         success = True
 
                         # Lưu checkpoint sau mỗi trang thành công
-                        self.save_checkpoint(pdf_path, i + 1, full_markdown_content)
+                        self.save_checkpoint(pdf_path, i + 1, full_markdown_content, total_blocks)
                         self.progress_signal.emit(i+1, total_blocks)
                         
                         if i < total_blocks - 1 and not self.app.stop_event.is_set():
@@ -694,8 +778,8 @@ class WorkerThread(QThread):
                 
                 if self.app.stop_event.is_set(): break
 
-            if full_markdown_content.strip():
-                # Xóa checkpoint khi hoàn thành
+            if full_markdown_content.strip() and not self.app.stop_event.is_set():
+                # Xóa checkpoint CHI KHI hoàn thành thực sự (không phải dừng)
                 self.clear_checkpoint(pdf_path)
 
             if full_markdown_content.strip():
