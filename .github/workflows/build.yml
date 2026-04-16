@@ -1,21 +1,55 @@
-name: Build and Upload to Release
+name: Build and Upload Artifacts
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      build_windows:
+        description: 'Build for Windows'
+        type: boolean
+        required: true
+        default: true
+      build_macos_x86:
+        description: 'Build for macOS (x86_64)'
+        type: boolean
+        required: true
+        default: true
+      build_macos_arm:
+        description: 'Build for macOS (arm64)'
+        type: boolean
+        required: true
+        default: true
 
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      run_any: ${{ steps.set-matrix.outputs.run_any }}
+    steps:
+      - id: set-matrix
+        run: |
+          MATRIX="[]"
+          RUN_ANY="false"
+          if [ "${{ inputs.build_windows }}" == "true" ]; then 
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "windows-latest", "suffix": "Windows"}]')
+            RUN_ANY="true"
+          fi
+          if [ "${{ inputs.build_macos_x86 }}" == "true" ]; then 
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "macos-15-intel", "suffix": "macOS-x86_64"}]')
+            RUN_ANY="true"
+          fi
+          if [ "${{ inputs.build_macos_arm }}" == "true" ]; then 
+            MATRIX=$(echo "$MATRIX" | jq -c '. += [{"os": "macos-15", "suffix": "macOS-arm64"}]')
+            RUN_ANY="true"
+          fi
+          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+          echo "run_any=$RUN_ANY" >> $GITHUB_OUTPUT
+
   build-and-upload:
+    needs: prepare-matrix
+    if: needs.prepare-matrix.outputs.run_any == 'true'
     strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            suffix: Windows
-          - os: macos-15-intel
-            suffix: macOS-x86_64
-          - os: macos-15
-            suffix: macOS-arm64
+      matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
@@ -73,13 +107,3 @@ jobs:
       with:
         name: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}
         path: PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip
-        
-    - name: Đính kèm file ZIP vào bài Release mới nhất
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        LATEST_TAG=$(gh release view --json tagName -q .tagName)
-        echo "Đang upload vào Release: $LATEST_TAG"
-        
-        gh release upload $LATEST_TAG PDFScan2Word-v${{ env.APP_VERSION }}-${{ matrix.suffix }}.zip --clobber
-      shell: bash
