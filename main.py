@@ -18,6 +18,7 @@ from datetime import datetime
 import json
 from PIL import Image, ImageEnhance
 import ssl
+import hashlib
 
 # --- MACOS CRASH FIX ---
 if sys.platform == "darwin":
@@ -58,6 +59,8 @@ def get_build_date():
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".pdfscan2word")
 API_KEY_FILE = os.path.join(CONFIG_DIR, "api_key.txt")
 CONFIG_JSON_FILE = os.path.join(CONFIG_DIR, "config.json")
+CHECKPOINT_DIR = os.path.join(CONFIG_DIR, "checkpoints")
+if not os.path.exists(CHECKPOINT_DIR): os.makedirs(CHECKPOINT_DIR)
 
 
 safety_config = {
@@ -171,6 +174,14 @@ STRINGS = {
         "log_rescue": "  [+] Đã cứu dữ liệu dưới dạng Markdown tại: {0}",
         "log_cancel": "\n[⏹] TIẾN TRÌNH ĐÃ BỊ HỦY BỞI NGƯỜI DÙNG.",
         "log_done": "\n[✓] ĐÃ HOÀN TẤT!",
+        "log_resume": "[*] Đang tiếp tục từ trang {0}/{1}...",
+        "log_bypass_try": "      [!] Google từ chối (Lỗi bản quyền). Đang thử Bypass lách bộ lọc (Lần {0})...",
+        "log_net_error": "      [!] Lỗi kết nối (Thử lại sau 5 giây): {0}",
+        "status_retrying": "Lỗi mạng - Đang thử lại...",
+        "btn_unfinished": "📋 CHƯA HOÀN THÀNH",
+        "history_title": "Danh sách tiến trình chưa xong",
+        "resume_title": "Tiếp tục tiến trình",
+        "resume_query": "Tìm thấy bản nháp của file này từ trước. Bạn có muốn tiếp tục từ trang {0} không?",
         "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
         "merge_title": "Tiện ích: Gộp ảnh thành PDF",
         "add_img": "Thêm ảnh",
@@ -236,6 +247,14 @@ STRINGS = {
         "log_rescue": "  [+] Rescued data as Markdown at: {0}",
         "log_cancel": "\n[⏹] PROCESS CANCELLED BY USER.",
         "log_done": "\n[✓] COMPLETED!",
+        "log_resume": "[*] Resuming from page {0}/{1}...",
+        "log_bypass_try": "      [!] Google refused (Copyright error). Attempting Bypass filter (Try {0})...",
+        "log_net_error": "      [!] Connection Error (Retrying in 5s): {0}",
+        "status_retrying": "Net Error - Retrying...",
+        "btn_unfinished": "📋 UNFINISHED",
+        "history_title": "Unfinished Tasks List",
+        "resume_title": "Resume Process",
+        "resume_query": "A previous draft for this file was found. Do you want to resume from page {0}?",
         "dev_footer": "Developed by @tozn607 | Version v{0} Build {1} | © {2}",
         "merge_title": "Utility: Merge Images to PDF",
         "add_img": "Add Images",
@@ -322,6 +341,12 @@ QSS = """
     QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QListWidget:focus {
         border: 1px solid #1f538d;
     }
+    QProgressBar#Error {
+        color: white;
+    }
+    QProgressBar#Error::chunk {
+        background-color: #a83232;
+    }
 """
 
 
@@ -375,16 +400,64 @@ class LanguageSelectorPopup(QDialog):
             self.selected_lang = "EN"
         self.accept()
 
+class CheckpointHistoryDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.app = parent
+        self.setWindowTitle(self.app.t("history_title"))
+        self.setMinimumSize(600, 400)
+        self.setStyleSheet(QSS)
+        
+        layout = QVBoxLayout(self)
+        self.listbox = QListWidget()
+        self.listbox.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.listbox.itemDoubleClicked.connect(self.on_select)
+        layout.addWidget(self.listbox)
+        
+        self.btn_select = QPushButton("Resume / Tiếp tục")
+        self.btn_select.setObjectName("Success")
+        self.btn_select.clicked.connect(self.on_select)
+        layout.addWidget(self.btn_select)
+        
+        self.checkpoints = []
+        self.load_checkpoints()
+        
+    def load_checkpoints(self):
+        if not os.path.exists(CHECKPOINT_DIR): return
+        for f in os.listdir(CHECKPOINT_DIR):
+            if f.endswith(".json"):
+                try:
+                    p = os.path.join(CHECKPOINT_DIR, f)
+                    with open(p, "r", encoding="utf-8") as file:
+                        data = json.load(file)
+                        filename = os.path.basename(data.get("pdf_path", "Unknown"))
+                        page = data.get("current_page", 0)
+                        self.checkpoints.append(data)
+                        self.listbox.addItem(f"{filename} - Page {page} (Draft)")
+                except: pass
+                
+    def on_select(self):
+        row = self.listbox.currentRow()
+        if row >= 0:
+            self.selected_data = self.checkpoints[row]
+            self.accept()
+        else:
+            self.reject()
+
 class WorkerThread(QThread):
     log_signal = pyqtSignal(str)
+    progress_signal = pyqtSignal(int, int) # current, total
+    status_signal = pyqtSignal(str, bool) # msg, is_error
     finished_signal = pyqtSignal()
 
-    def __init__(self, app_instance, input_path, output_dir, mode):
+    def __init__(self, app_instance, input_path, output_dir, mode, resume_at=0, initial_content=""):
         super().__init__()
         self.app = app_instance
         self.input_path = input_path
         self.output_dir = output_dir
         self.mode = mode
+        self.resume_at = resume_at
+        self.initial_content = initial_content
         
     def run(self):
         import time 
@@ -397,6 +470,51 @@ class WorkerThread(QThread):
 
     def write_log(self, msg):
         self.log_signal.emit(msg)
+
+    def get_checkpoint_path(self, pdf_path):
+        import hashlib
+        # Dùng absolute path để tránh lỗi trùng hash khác nhau khi restart app
+        abs_path = os.path.abspath(pdf_path)
+        pdf_id = hashlib.md5(abs_path.encode('utf-8')).hexdigest()
+        return os.path.join(CHECKPOINT_DIR, f"{pdf_id}.json")
+
+    def save_checkpoint(self, pdf_path, page_idx, content):
+        try:
+            cp_path = self.get_checkpoint_path(pdf_path)
+            data = {
+                "pdf_path": pdf_path,
+                "current_page": page_idx,
+                "content": content,
+                "options": {
+                    "solve": self.app.solve_var,
+                    "cover": self.app.cover_var,
+                    "merge": self.app.merge_pages_var,
+                    "lang": self.app.current_lang,
+                    "mode": self.app.t("mode_single") if self.app.btn_mode_single.isChecked() else self.app.t("mode_batch")
+                }
+            }
+            with open(cp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except: pass
+
+    def clear_checkpoint(self, pdf_path):
+        try:
+            cp_path = self.get_checkpoint_path(pdf_path)
+            if os.path.exists(cp_path):
+                os.remove(cp_path)
+        except: pass
+
+    def transform_image_bypass(self, image, attempt):
+        try:
+            if attempt == 0: return image
+            if attempt == 1: return ImageEnhance.Contrast(image).enhance(1.1)
+            if attempt == 2: return ImageEnhance.Brightness(image).enhance(0.9)
+            if attempt == 3:
+                w, h = image.size
+                return image.crop((2, 2, w - 2, h - 2))
+            if attempt == 4: return ImageEnhance.Sharpness(image).enhance(1.5)
+            return ImageEnhance.Contrast(image).enhance(1.2)
+        except: return image
 
     def process_documents(self, input_path, output_dir, mode):
         if mode == self.app.t("mode_single"):
@@ -480,40 +598,105 @@ class WorkerThread(QThread):
             else:
                 processed_images = images[start_idx:]
 
-            full_markdown_content = ""
-            max_retries = 5 
+            # --- RESUME LOGIC ---
+            file_resume_at = 0
+            file_initial_content = ""
+            
+            # Nếu là file đầu tiên và có resume_at từ constructor (Single Mode), ưu tiên dùng nó
+            if file_idx == 0 and self.resume_at > 0:
+                file_resume_at = self.resume_at
+                file_initial_content = self.initial_content
+                self.write_log(self.app.t("log_resume", file_resume_at, len(processed_images)))
+            else:
+                cp_path = self.get_checkpoint_path(pdf_path)
+                if os.path.exists(cp_path):
+                    try:
+                        with open(cp_path, "r", encoding="utf-8") as f:
+                            cp_data = json.load(f)
+                            # Chỉ resume nếu các option giống hệt nhau
+                            opts = cp_data.get("options", {})
+                            if (opts.get("solve") == self.app.solve_var and 
+                                opts.get("cover") == self.app.cover_var and 
+                                opts.get("merge") == self.app.merge_pages_var):
+                                
+                                file_resume_at = cp_data.get("current_page", 0)
+                                file_initial_content = cp_data.get("content", "")
+                                if file_resume_at > 0:
+                                    self.write_log(self.app.t("log_resume", file_resume_at, len(processed_images)))
+                    except: pass
 
-            for i, image in enumerate(processed_images):
+            full_markdown_content = file_initial_content
+            max_retries = 10 
+
+            total_blocks = len(processed_images)
+            self.progress_signal.emit(file_resume_at, total_blocks)
+
+            for i in range(file_resume_at, total_blocks):
+                image = processed_images[i]
                 if self.app.stop_event.is_set():
                     break
 
-                self.write_log(self.app.t("log_read_block", i+1, len(processed_images)))
+                self.write_log(self.app.t("log_read_block", i+1, total_blocks))
                 
+                success = False
+                current_image = image
                 for attempt in range(max_retries):
                     if self.app.stop_event.is_set(): break
                     try:
-                        response = model.generate_content([active_prompt, image], safety_settings=safety_config)
+                        response = model.generate_content([active_prompt, current_image], safety_settings=safety_config)
                         try:
                             text_result = response.text
                         except ValueError:
-                            self.write_log(self.app.t("log_reject", i+1))
-                            text_result = f"> **[COPYRIGHT BLOCK: PAGE {i+1}]**"
-                            full_markdown_content += f"\n\n\n\n{text_result}\n\n"
-                            break
+                            # Lỗi bản quyền / Safety filter
+                            if attempt < 5: 
+                                self.write_log(self.app.t("log_bypass_try", attempt + 1))
+                                current_image = self.transform_image_bypass(image, attempt + 1)
+                                time.sleep(2)
+                                continue
+                            else:
+                                self.write_log(self.app.t("log_reject", i+1))
+                                text_result = f"> **[COPYRIGHT BLOCK: PAGE {i+1}]**"
+                                full_markdown_content += f"\n\n\n\n{text_result}\n\n"
+                                success = True
+                                break
                         
                         text_result = text_result.replace("[^", f"[^p{i}_")
                         full_markdown_content += f"\n\n\n\n{text_result}\n\n"
+                        success = True
+
+                        # Lưu checkpoint sau mỗi trang thành công
+                        self.save_checkpoint(pdf_path, i + 1, full_markdown_content)
+                        self.progress_signal.emit(i+1, total_blocks)
                         
-                        if i < len(images) - 1 and not self.app.stop_event.is_set():
+                        if i < total_blocks - 1 and not self.app.stop_event.is_set():
                             time.sleep(3) 
                         break 
                         
                     except Exception as e:
-                        self.write_log(self.app.t("log_err_attempt", attempt+1, max_retries, e))
+                        msg = str(e)
+                        is_conn_error = any(kw in msg.lower() for kw in ["connection", "network", "timeout", "http"])
+                        
+                        if is_conn_error:
+                            self.write_log(self.app.t("log_net_error", msg))
+                            self.status_signal.emit(self.app.t("status_retrying"), True)
+                        else:
+                            self.write_log(self.app.t("log_err_attempt", attempt+1, max_retries, e))
+                        
                         if attempt < max_retries - 1:
-                            time.sleep(60) 
+                            # Tối ưu: Đợi 5 giây thay vì 120 giây
+                            wait_time = 5 if is_conn_error else 30
+                            time.sleep(wait_time) 
+                            # Sau khi đợi xong, nếu là lỗi mạng thì reset trạng thái UI để thử lại
+                            if is_conn_error: self.status_signal.emit("", False)
                         else:
                             self.write_log(self.app.t("log_skip", i+1))
+                            self.status_signal.emit("", False)
+                
+                if self.app.stop_event.is_set(): break
+
+            if full_markdown_content.strip():
+                # Xóa checkpoint khi hoàn thành
+                self.clear_checkpoint(pdf_path)
 
             if full_markdown_content.strip():
                 try:
@@ -758,10 +941,10 @@ class PDFOCRApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_lang = "VN" # Default
-        self.load_config()
         self.solve_var = False
         self.cover_var = False
         self.merge_pages_var = False
+        self.load_config()
         self.stop_event = threading.Event()
         self.start_time = None
         self.timer_running = False
@@ -786,6 +969,9 @@ class PDFOCRApp(QMainWindow):
         self.update_available_signal.connect(self.prompt_update)
         # Update check threaded
         threading.Thread(target=self.check_for_updates, daemon=True).start()
+        
+        # Auto check for unfinished tasks on startup
+        QTimer.singleShot(1000, self.auto_check_checkpoints)
 
     def t(self, key, *args):
         text = STRINGS.get(self.current_lang, STRINGS["VN"]).get(key, key)
@@ -798,13 +984,21 @@ class PDFOCRApp(QMainWindow):
                 with open(CONFIG_JSON_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.current_lang = data.get("lang", "VN")
+                    self.solve_var = data.get("solve", False)
+                    self.cover_var = data.get("cover", False)
+                    self.merge_pages_var = data.get("merge", False)
             except: pass
 
     def save_config(self):
         if not os.path.exists(CONFIG_DIR): os.makedirs(CONFIG_DIR)
         try:
             with open(CONFIG_JSON_FILE, "w", encoding="utf-8") as f:
-                json.dump({"lang": self.current_lang}, f)
+                json.dump({
+                    "lang": self.current_lang,
+                    "solve": self.solve_var,
+                    "cover": self.cover_var,
+                    "merge": self.merge_pages_var
+                }, f)
         except: pass
 
     def show_language_popup(self):
@@ -832,8 +1026,14 @@ class PDFOCRApp(QMainWindow):
         self.btn_merge.setObjectName("Success")
         self.btn_merge.setMinimumHeight(40)
         self.btn_merge.clicked.connect(self.open_merge_popup)
+        
+        self.btn_unfinished = QPushButton("")
+        self.btn_unfinished.setMinimumHeight(40)
+        self.btn_unfinished.clicked.connect(self.open_unfinished_manager)
+        
         menu_layout.addWidget(self.lbl_toolbar)
         menu_layout.addWidget(self.btn_merge)
+        menu_layout.addWidget(self.btn_unfinished)
         menu_layout.addStretch()
         
         self.lbl_lang = QLabel("🌐")
@@ -956,6 +1156,15 @@ class PDFOCRApp(QMainWindow):
         self.lbl_timer.setStyleSheet("color: #3a7ebf;")
         content_layout.addWidget(self.lbl_timer)
 
+        # PROGRESS BAR
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%v/%m")
+        self.progress_bar.hide()
+        content_layout.addWidget(self.progress_bar)
+
         # LOG
         self.log_box = QTextEdit()
         self.log_box.setReadOnly(True)
@@ -979,11 +1188,13 @@ class PDFOCRApp(QMainWindow):
         self.solve_var = self.chk_solve.isChecked()
         self.cover_var = self.chk_cover.isChecked()
         self.merge_pages_var = self.chk_merge_pages.isChecked()
+        self.save_config()
 
     def update_ui_texts(self):
         self.setWindowTitle(self.t("title") + " v" + CURRENT_VERSION)
         self.lbl_toolbar.setText(self.t("toolbar"))
         self.btn_merge.setText(self.t("merge_pdf"))
+        self.btn_unfinished.setText(self.t("btn_unfinished"))
         
         self.btn_mode_single.setText(self.t("mode_single"))
         self.btn_mode_batch.setText(self.t("mode_batch"))
@@ -993,8 +1204,11 @@ class PDFOCRApp(QMainWindow):
         self.btn_load_api.setText(self.t("load_api"))
         
         self.chk_solve.setText(self.t("solve_opt"))
+        self.chk_solve.setChecked(self.solve_var)
         self.chk_cover.setText(self.t("cover_opt"))
+        self.chk_cover.setChecked(self.cover_var)
         self.chk_merge_pages.setText(self.t("merge_opt"))
+        self.chk_merge_pages.setChecked(self.merge_pages_var)
         
         self.btn_start.setText(self.t("start"))
         self.btn_stop.setText(self.t("stop"))
@@ -1114,10 +1328,59 @@ class PDFOCRApp(QMainWindow):
         genai.configure(api_key=api_key)
         
         mode = self.t("mode_single") if self.btn_mode_single.isChecked() else self.t("mode_batch")
-        self.worker = WorkerThread(self, input_path, output_dir, mode)
+        
+        resume_at = 0
+        initial_content = ""
+
+        # Check checkpoint for Single Mode solely to prompt
+        if mode == self.t("mode_single"):
+            abs_input = os.path.abspath(input_path)
+            pdf_id = hashlib.md5(abs_input.encode('utf-8')).hexdigest()
+            cp_path = os.path.join(CHECKPOINT_DIR, f"{pdf_id}.json")
+            if os.path.exists(cp_path):
+                try:
+                    with open(cp_path, "r", encoding="utf-8") as f:
+                        cp_data = json.load(f)
+                        page = cp_data.get("current_page", 0)
+                        if page > 0:
+                            ret = QMessageBox.question(self, self.t("resume_title"), 
+                                                     self.t("resume_query", page),
+                                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                            if ret == QMessageBox.StandardButton.Yes:
+                                resume_at = page
+                                initial_content = cp_data.get("content", "")
+                            else:
+                                # User chose No, clear checkpoint to start fresh
+                                if os.path.exists(cp_path): os.remove(cp_path)
+                except: pass
+
+        self.worker = WorkerThread(self, input_path, output_dir, mode, resume_at, initial_content)
         self.worker.log_signal.connect(self.write_log)
+        self.worker.progress_signal.connect(self.update_progress)
+        self.worker.status_signal.connect(self.handle_status)
         self.worker.finished_signal.connect(self.reset_ui)
+        
+        self.progress_bar.show()
+        self.progress_bar.setValue(0)
+        self.progress_bar.setObjectName("")
+        self.progress_bar.setStyleSheet("")
+        
         self.worker.start()
+
+    def handle_status(self, msg, is_error):
+        if is_error:
+            self.progress_bar.setObjectName("Error")
+            self.progress_bar.setFormat(msg)
+            self.progress_bar.setStyleSheet("QProgressBar#Error { color: white; } QProgressBar#Error::chunk { background-color: #a83232; }")
+        else:
+            self.progress_bar.setObjectName("")
+            self.progress_bar.setFormat("%v/%m")
+            self.progress_bar.setStyleSheet("")
+
+    def update_progress(self, current, total):
+        if total > 0:
+            self.progress_bar.setMaximum(total)
+            self.progress_bar.setValue(current)
 
     def reset_ui(self):
         self.timer_running = False
@@ -1128,6 +1391,7 @@ class PDFOCRApp(QMainWindow):
         self.btn_mode_single.setEnabled(True)
         self.btn_mode_batch.setEnabled(True)
         self.btn_stop.setEnabled(False)
+        self.progress_bar.hide()
 
     def update_timer_ui(self):
         if self.timer_running and self.start_time:
@@ -1232,6 +1496,48 @@ rm "$0"
             subprocess.Popen([script_path])
             
         QApplication.quit()
+
+    def open_unfinished_manager(self):
+        dlg = CheckpointHistoryDialog(self)
+        if dlg.exec():
+            data = dlg.selected_data
+            opts = data.get("options", {})
+            
+            # 1. Update Mode (Quan trọng: Phải làm trước khi update_ui_texts)
+            saved_mode = opts.get("mode")
+            if saved_mode == self.t("mode_batch"):
+                self.btn_mode_batch.setChecked(True)
+            else:
+                self.btn_mode_single.setChecked(True)
+            
+            # 2. Update Options
+            self.chk_solve.setChecked(opts.get("solve", False))
+            self.chk_cover.setChecked(opts.get("cover", False))
+            self.chk_merge_pages.setChecked(opts.get("merge", False))
+            self.current_lang = opts.get("lang", "VN")
+            
+            # 3. Update Language Menu
+            idx = 0 if self.current_lang == "EN" else 1
+            self.lang_menu.setCurrentIndex(idx)
+            
+            # 4. Update UI Texts (Cái này sẽ gọi change_mode và clear entry_input)
+            self.update_ui_texts()
+            
+            # 5. Set Path (Cuối cùng để không bị clear)
+            pdf_path = data.get("pdf_path", "")
+            self.entry_input.setText(pdf_path)
+            
+            self.write_log(f"[*] Loaded checkpoint for: {os.path.basename(pdf_path)}")
+
+    def auto_check_checkpoints(self):
+        if not os.path.exists(CHECKPOINT_DIR): return
+        files = [f for f in os.listdir(CHECKPOINT_DIR) if f.endswith(".json")]
+        if files:
+            ret = QMessageBox.information(self, self.t("resume_title"), 
+                                        f"Phát hiện {len(files)} tiến trình chưa hoàn thành. Bạn có muốn xem danh sách để tiếp tục không?\nDetected {len(files)} unfinished tasks. View them to resume?",
+                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if ret == QMessageBox.StandardButton.Yes:
+                self.open_unfinished_manager()
 
     def open_merge_popup(self):
         self.merge_window = MergeWindow(self)
