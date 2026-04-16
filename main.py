@@ -44,7 +44,7 @@ try:
 except ImportError:
     print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
-CURRENT_VERSION = "2.0.1"
+CURRENT_VERSION = "2.1.0"
 GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
