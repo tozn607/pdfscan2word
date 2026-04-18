@@ -208,7 +208,17 @@ STRINGS = {
         "speed_turbo": "Tối đa (Turbo)",
         "desc_eco": "An toàn nhất cho key miễn phí. Rất ít khi bị lỗi giới hạn (Rate limit).",
         "desc_balanced": "Xử lý nhanh hơn. Có nguy cơ nhỏ bị Google giới hạn tạm thời.",
-        "desc_turbo": "Tốc độ cực nhanh. Khuyến nghị dùng cho Key trả phí (Google Cloud)."
+        "desc_turbo": "Tốc độ cực nhanh. Khuyến nghị dùng cho Key trả phí (Google Cloud).",
+        "btn_update": "🔄 CẬP NHẬT",
+        "build_info": "Thông tin bản dựng",
+        "update_menu_title": "Cập nhật ứng dụng",
+        "repo_btn": "🌐 Truy cập Repository",
+        "check_update_btn": "🔍 Kiểm tra cập nhật",
+        "current_ver_label": "Phiên bản hiện tại: {0}",
+        "latest_ver_label": "Phiên bản mới nhất: {0}",
+        "build_date_label": "Ngày dựng: {0}",
+        "up_to_date_msg": "Bạn đang sử dụng phiên bản mới nhất.",
+        "update_searching": "Đang kiểm tra..."
     },
     "EN": {
         "title": "Image to Word Converter",
@@ -291,7 +301,17 @@ STRINGS = {
         "speed_turbo": "Turbo Mode",
         "desc_eco": "Safest for free keys. Very low risk of reaching Google's limits.",
         "desc_balanced": "Faster processing. Moderate risk of temporary limits on free keys.",
-        "desc_turbo": "Extremely fast. Recommended for Paid API keys (Cloud) to avoid errors."
+        "desc_turbo": "Extremely fast. Recommended for Paid API keys (Cloud) to avoid errors.",
+        "btn_update": "🔄 UPDATE",
+        "build_info": "Build Information",
+        "update_menu_title": "App Update",
+        "repo_btn": "🌐 Open Repository",
+        "check_update_btn": "🔍 Check for Updates",
+        "current_ver_label": "Current Version: {0}",
+        "latest_ver_label": "Latest Version: {0}",
+        "build_date_label": "Build Date: {0}",
+        "up_to_date_msg": "You are using the latest version.",
+        "update_searching": "Checking..."
     }
 }
 
@@ -300,7 +320,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QLineEdit, QPushButton, 
                              QCheckBox, QComboBox, QTextEdit, QFileDialog, 
                              QMessageBox, QDialog, QButtonGroup, QListWidget, QFrame,
-                             QSizePolicy, QScrollArea, QAbstractItemView, QProgressBar)
+                             QSizePolicy, QScrollArea, QAbstractItemView, QProgressBar, QGroupBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QTimer, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QCursor
 
@@ -1061,6 +1081,146 @@ class UpdateProgressDialog(QDialog):
             self.parent().perform_update_swap(temp_dir)
             self.accept()
 
+class UpdateMenuDialog(QDialog):
+    check_finished_signal = pyqtSignal(bool)
+    check_error_signal = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.app = parent
+        self.setWindowTitle(self.app.t("update_menu_title"))
+        self.setFixedSize(450, 320)
+        self.setStyleSheet(QSS)
+
+        self.check_finished_signal.connect(self.finish_check)
+        self.check_error_signal.connect(self.handle_check_error)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
+        
+        # Build Info Section
+        info_group = QGroupBox(self.app.t("build_info"))
+        info_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #ccc; border-radius: 8px; margin-top: 10px; padding-top: 10px; } QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 3px; }")
+        info_layout = QVBoxLayout(info_group)
+        
+        self.lbl_current = QLabel(self.app.t("current_ver_label", CURRENT_VERSION))
+        self.lbl_current.setFont(QFont(".AppleSystemUIFont", 11))
+        
+        b_date = self.app.build_date.strftime("%Y-%m-%d %H:%M:%S")
+        self.lbl_build_date = QLabel(self.app.t("build_date_label", f"{b_date} ({self.app.build_str})"))
+        self.lbl_build_date.setFont(QFont(".AppleSystemUIFont", 11))
+        
+        info_layout.addWidget(self.lbl_current)
+        info_layout.addWidget(self.lbl_build_date)
+        layout.addWidget(info_group)
+        
+        # Latest Version Info
+        self.lbl_latest = QLabel(self.app.t("latest_ver_label", self.app.latest_version if self.app.latest_version else "---"))
+        self.lbl_latest.setFont(QFont(".AppleSystemUIFont", 11, QFont.Weight.Bold))
+        layout.addWidget(self.lbl_latest)
+        
+        # Status Label
+        self.lbl_status = QLabel("")
+        self.lbl_status.setStyleSheet("color: #3a7ebf;")
+        self.lbl_status.setWordWrap(True)
+        layout.addWidget(self.lbl_status)
+        
+        # Actions
+        actions_layout = QHBoxLayout()
+        self.btn_check = QPushButton(self.app.t("check_update_btn"))
+        self.btn_check.setMinimumHeight(35)
+        self.btn_check.clicked.connect(self.check_now)
+        
+        self.btn_repo = QPushButton(self.app.t("repo_btn"))
+        self.btn_repo.setMinimumHeight(35)
+        self.btn_repo.clicked.connect(self.open_repo)
+        
+        actions_layout.addWidget(self.btn_check)
+        actions_layout.addWidget(self.btn_repo)
+        layout.addLayout(actions_layout)
+        
+        self.btn_install = QPushButton(self.app.t("btn_yes")) 
+        self.btn_install.setObjectName("Success")
+        self.btn_install.setMinimumHeight(45)
+        self.btn_install.setVisible(False)
+        self.btn_install.clicked.connect(self.install_update)
+        layout.addWidget(self.btn_install)
+        
+        if self.app.latest_version and self.app.latest_version > CURRENT_VERSION:
+            self.show_update_available()
+
+    def check_now(self):
+        self.lbl_status.setText(self.app.t("update_searching"))
+        self.btn_check.setEnabled(False)
+        threading.Thread(target=self.run_check, daemon=True).start()
+        
+    def run_check(self):
+        try:
+            req = urllib.request.Request(GITHUB_API_URL, headers={'User-Agent': 'PDFScan2Word-App'})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                data = json.loads(r.read().decode('utf-8'))
+                latest = data.get('tag_name', '').lstrip('v')
+            
+            if not latest:
+                raise Exception("Could not find tag_name in API response")
+
+            # Fetch download URL if available
+            download_url = ""
+            is_new = False
+            # Simple version comparison (works for strictly increasing numeric strings like 2.2.0)
+            if latest > CURRENT_VERSION:
+                is_new = True
+                if sys.platform == "win32":
+                    suffix = "Windows.zip"
+                elif sys.platform == "darwin":
+                    arch = platform.machine()
+                    suffix = "macOS-arm64.zip" if arch == "arm64" else "macOS-x86_64.zip"
+                else:
+                    suffix = None
+                
+                if suffix:
+                    for asset in data.get('assets', []):
+                        if asset.get('name', '').endswith(suffix):
+                            download_url = asset.get('browser_download_url', '')
+                            break
+            
+            self.app.latest_version = latest
+            self.app.download_url = download_url
+            
+            self.check_finished_signal.emit(is_new)
+
+        except Exception as e:
+            self.check_error_signal.emit(str(e))
+
+    def handle_check_error(self, msg):
+        self.lbl_status.setText(f"Error: {msg}")
+        self.btn_check.setEnabled(True)
+
+    def finish_check(self, available):
+        self.btn_check.setEnabled(True)
+        self.lbl_latest.setText(self.app.t("latest_ver_label", self.app.latest_version))
+        if available:
+            self.show_update_available()
+        else:
+            self.lbl_status.setText(self.app.t("up_to_date_msg"))
+            self.btn_install.setVisible(False)
+
+    def show_update_available(self):
+        self.lbl_status.setText(f"New version v{self.app.latest_version} is available!")
+        self.btn_install.setVisible(True)
+
+    def open_repo(self):
+        webbrowser.open("https://github.com/tozn607/pdfscan2word")
+
+    def install_update(self):
+        if self.app.download_url:
+            self.accept()
+            self.app.prompt_update(self.app.latest_version, self.app.download_url)
+        else:
+            webbrowser.open(RELEASES_URL)
+            self.accept()
+
 class PDFOCRApp(QMainWindow):
     update_available_signal = pyqtSignal(str, str)
     
@@ -1081,6 +1241,12 @@ class PDFOCRApp(QMainWindow):
         self.resize(840, 750)
         self.setStyleSheet(QSS)
         
+        self.latest_version = None
+        self.download_url = None
+        self.build_date = get_build_date()
+        self.build_str = self.build_date.strftime("%Y%m%d")
+        self.year_str = self.build_date.strftime("%Y")
+
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_timer_ui)
         
@@ -1159,9 +1325,14 @@ class PDFOCRApp(QMainWindow):
         self.btn_unfinished.setMinimumHeight(40)
         self.btn_unfinished.clicked.connect(self.open_unfinished_manager)
         
+        self.btn_update = QPushButton("")
+        self.btn_update.setMinimumHeight(40)
+        self.btn_update.clicked.connect(self.open_update_menu)
+        
         menu_layout.addWidget(self.lbl_toolbar)
         menu_layout.addWidget(self.btn_merge)
         menu_layout.addWidget(self.btn_unfinished)
+        menu_layout.addWidget(self.btn_update)
         menu_layout.addStretch()
         
         self.lbl_lang = QLabel("🌐")
@@ -1324,10 +1495,6 @@ class PDFOCRApp(QMainWindow):
         content_layout.addWidget(self.log_box)
 
         # FOOTER
-        build_date = get_build_date()
-        self.build_str = build_date.strftime("%Y%m%d")
-        self.year_str = build_date.strftime("%Y")
-        
         self.lbl_footer = QLabel("")
         self.lbl_footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_footer.setStyleSheet("color: gray;")
@@ -1355,6 +1522,7 @@ class PDFOCRApp(QMainWindow):
         self.lbl_toolbar.setText(self.t("toolbar"))
         self.btn_merge.setText(self.t("merge_pdf"))
         self.btn_unfinished.setText(self.t("btn_unfinished"))
+        self.btn_update.setText(self.t("btn_update"))
         
         self.btn_mode_single.setText(self.t("mode_single"))
         self.btn_mode_batch.setText(self.t("mode_batch"))
@@ -1591,6 +1759,9 @@ class PDFOCRApp(QMainWindow):
                         download_url = asset.get('browser_download_url', '')
                         break
                         
+                self.latest_version = latest
+                self.download_url = download_url
+                
                 if download_url:
                     self.update_available_signal.emit(latest, download_url)
                 else:
@@ -1709,6 +1880,10 @@ rm "$0"
     def open_merge_popup(self):
         self.merge_window = MergeWindow(self)
         self.merge_window.exec()
+
+    def open_update_menu(self):
+        dlg = UpdateMenuDialog(self)
+        dlg.exec()
 
 def _qt_message_handler(mode, context, message):
     msg = str(message)

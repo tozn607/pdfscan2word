@@ -24,6 +24,8 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 Phiên bản này tập trung vào hiệu suất và sự ổn định:
 - **Xử lý Song song:** Tăng siêu tốc độ quét (scan) bằng cách xử lý đồng thời nhiều trang PDF, thay vì xử lý tuần tự từng trang.
 - **Tùy chỉnh Tốc độ:** Thêm lựa chọn "Tốc độ xử lý" với 3 mức (Eco, Balanced, Turbo) giúp tối ưu hóa quota API cho cả tài khoản Free và Paid.
+- **Hệ thống Cập nhật:** Tích hợp nút Cập nhật và Menu quản lý phiên bản mới ngay trong thanh công cụ, hỗ trợ kiểm tra và tải bản cập nhật trực tiếp.
+- **Truy cập Repository:** Thêm liên kết nhanh đến GitHub ngay trong Menu Cập nhật để người dùng dễ dàng theo dõi mã nguồn và tài liệu.
 - **Nâng cấp SDK Gemini:** Chuyển đổi sang thư viện `google-genai` mới nhất của Google để đảm bảo hiệu năng và hỗ trợ lâu dài.
 - **Cải thiện độ ổn định:** Hệ thống tự động lắp ráp trang theo đúng thứ tự bản gốc kể cả khi xử lý song song, đồng thời tối ưu chiến lược backoff khi gặp lỗi giới hạn API (429).
 - **Trải nghiệm Native:** Sử dụng font chữ hệ thống trên macOS và khắc phục triệt để các cảnh báo console liên quan đến accessibility.
@@ -70,6 +72,8 @@ python main.py
 This update focuses on performance, speed, and reliability:
 - **Parallel Execution:** Scanning speed is multiplied. The core engine now processes multiple PDF pages concurrently rather than one by one.
 - **Processing Speed Controls:** New "Processing Speed" card with 3 selectable tiers (Eco, Balanced, Turbo) to optimize API quota usage for both Free and Paid accounts.
+- **Integrated Update System:** Added an Update button and version management menu within the app for manual checks and easy installations.
+- **Direct Repository Link:** Quick access to the GitHub project page directly from the Update Menu.
 - **Modernized Gemini SDK:** Fully migrated to the new `google-genai` SDK for increased stability and future-proofing.
 - **Perfect Page Assembly:** Guaranteed reassembly of pages in the exact original sequence even during high-speed parallel processing.
 - **Native UI & Stability:** Native macOS system font support and improved rate-limit protection with smarter exponential backoff strategies.
