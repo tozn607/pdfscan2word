@@ -3,7 +3,7 @@
 
 PyQt6
 PyMuPDF
-google-generativeai
+google-genai
 pypandoc
 Pillow
 pillow-heif

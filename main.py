@@ -34,8 +34,8 @@ else:
 # --------------------------------------------------------
 
 import fitz 
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google import genai
+from google.genai import types
 import pypandoc
 
 try:
@@ -63,12 +63,12 @@ CHECKPOINT_DIR = os.path.join(CONFIG_DIR, "checkpoints")
 if not os.path.exists(CHECKPOINT_DIR): os.makedirs(CHECKPOINT_DIR)
 
 
-safety_config = {
-    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-}
+safety_config = [
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+]
 
 PROMPT_VN = r"""
 Bạn là một chuyên gia số hóa và phục hồi tài liệu chuyên nghiệp. Dưới đây là hình ảnh scan của một trang tài liệu/giáo trình. 
@@ -201,7 +201,14 @@ STRINGS = {
         "update_msg": "Có phiên bản mới: v{0}\nPhiên bản hiện tại: v{1}\n\nBạn có muốn tải bản cập nhật về không?",
         "btn_yes": "Tải ngay",
         "btn_no": "Bỏ qua",
-        "prompt_solve_ext": "\n\n6. YÊU CẦU ĐẶC BIỆT: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó."
+        "prompt_solve_ext": "\n\n6. YÊU CẦU ĐẶC BIỆC: Tài liệu này chứa các bài tập/câu hỏi. Bạn BẮT BUỘC phải đọc và TRẢ LỜI/GIẢI CHI TIẾT các bài tập đó. Hãy tạo một phần 'ĐÁP ÁN' riêng biệt và rõ ràng ở cuối tài liệu và viết đáp án ở đó.",
+        "speed_label": "🚀 Tốc độ xử lý:",
+        "speed_eco": "Tiết kiệm (Eco)",
+        "speed_balanced": "Cân bằng (Balanced)",
+        "speed_turbo": "Tối đa (Turbo)",
+        "desc_eco": "An toàn nhất cho key miễn phí. Rất ít khi bị lỗi giới hạn (Rate limit).",
+        "desc_balanced": "Xử lý nhanh hơn. Có nguy cơ nhỏ bị Google giới hạn tạm thời.",
+        "desc_turbo": "Tốc độ cực nhanh. Khuyến nghị dùng cho Key trả phí (Google Cloud)."
     },
     "EN": {
         "title": "Image to Word Converter",
@@ -277,7 +284,14 @@ STRINGS = {
         "update_msg": "New version available: v{0}\nCurrent version: v{1}\n\nDo you want to download the update?",
         "btn_yes": "Download Now",
         "btn_no": "Skip",
-        "prompt_solve_ext": "\n\n6. SPECIAL REQUIREMENT: This document contains exercises/questions. You MUST read and ANSWER/SOLVE them in detail. Create a clear, separate 'ANSWERS' section at the end of the document and write your answers there."
+        "prompt_solve_ext": "\n\n6. SPECIAL REQUIREMENT: This document contains exercises/questions. You MUST read and ANSWER/SOLVE them in detail. Create a clear, separate 'ANSWERS' section at the end of the document and write your answers there.",
+        "speed_label": "🚀 Processing Speed:",
+        "speed_eco": "Eco Mode",
+        "speed_balanced": "Balanced",
+        "speed_turbo": "Turbo Mode",
+        "desc_eco": "Safest for free keys. Very low risk of reaching Google's limits.",
+        "desc_balanced": "Faster processing. Moderate risk of temporary limits on free keys.",
+        "desc_turbo": "Extremely fast. Recommended for Paid API keys (Cloud) to avoid errors."
     }
 }
 
@@ -292,7 +306,6 @@ from PyQt6.QtGui import QFont, QIcon, QColor, QPalette, QCursor
 
 QSS = """
     QWidget {
-        font-family: 'Segoe UI', Arial, sans-serif;
         font-size: 14px;
     }
     QFrame#Card {
@@ -367,7 +380,7 @@ class LanguageSelectorPopup(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         
         lbl = QLabel("Welcome! Please choose your preferred language.\nChào mừng! Vui lòng chọn ngôn ngữ của bạn.")
-        font = QFont("Segoe UI", 13, QFont.Weight.Bold)
+        font = QFont(".AppleSystemUIFont", 13, QFont.Weight.Bold)
         lbl.setFont(font)
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl)
@@ -377,11 +390,11 @@ class LanguageSelectorPopup(QDialog):
         self.btn_en = QPushButton("🇺🇸 English")
         self.btn_en.setCheckable(True)
         self.btn_en.setChecked(True)
-        self.btn_en.setFont(QFont("Segoe UI", 12))
+        self.btn_en.setFont(QFont(".AppleSystemUIFont", 12))
         
         self.btn_vn = QPushButton("🇻🇳 Tiếng Việt")
         self.btn_vn.setCheckable(True)
-        self.btn_vn.setFont(QFont("Segoe UI", 12))
+        self.btn_vn.setFont(QFont(".AppleSystemUIFont", 12))
         
         self.group = QButtonGroup(self)
         self.group.addButton(self.btn_en)
@@ -395,7 +408,7 @@ class LanguageSelectorPopup(QDialog):
         self.btn_save = QPushButton("Continue / Tiếp tục")
         self.btn_save.setObjectName("Success")
         self.btn_save.setMinimumHeight(45)
-        self.btn_save.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        self.btn_save.setFont(QFont(".AppleSystemUIFont", 13, QFont.Weight.Bold))
         self.btn_save.clicked.connect(self.on_save)
         layout.addWidget(self.btn_save)
         
@@ -531,14 +544,24 @@ class WorkerThread(QThread):
     status_signal = pyqtSignal(str, bool) # msg, is_error
     finished_signal = pyqtSignal()
 
-    def __init__(self, app_instance, input_path, output_dir, mode, resume_at=0, initial_content=""):
+    SPEED_CONFIGS = {
+        0: {"threads": 1, "delay": 2.0},  # Eco
+        1: {"threads": 3, "delay": 0.5},  # Balanced
+        2: {"threads": 6, "delay": 0.0}   # Turbo
+    }
+
+    def __init__(self, app_instance, input_path, output_dir, mode, resume_at=0, initial_content="", speed_idx=1, client=None):
         super().__init__()
         self.app = app_instance
+        self.client = client
         self.input_path = input_path
         self.output_dir = output_dir
         self.mode = mode
         self.resume_at = resume_at
         self.initial_content = initial_content
+        self.speed_idx = speed_idx
+        self.config = self.SPEED_CONFIGS.get(speed_idx, self.SPEED_CONFIGS[1])
+        self.checkpoint_lock = threading.Lock()
         
     def run(self):
         import time 
@@ -612,7 +635,7 @@ class WorkerThread(QThread):
 
         total_files = len(pdf_files)
         self.write_log(self.app.t("log_start_batch", total_files))
-        model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+        model_id = 'gemini-3.1-flash-lite-preview'
 
         active_prompt = PROMPT_EN if self.app.current_lang == "EN" else PROMPT_VN
         if self.app.solve_var:
@@ -711,72 +734,91 @@ class WorkerThread(QThread):
 
             full_markdown_content = file_initial_content
             max_retries = 10 
-
             total_blocks = len(processed_images)
             self.progress_signal.emit(file_resume_at, total_blocks)
 
-            for i in range(file_resume_at, total_blocks):
-                image = processed_images[i]
-                if self.app.stop_event.is_set():
-                    break
+            # --- PARALLEL PROCESSING ---
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            results_map = {}
+            next_to_save = file_resume_at
 
-                self.write_log(self.app.t("log_read_block", i+1, total_blocks))
+            def process_page(idx):
+                if self.app.stop_event.is_set(): return None
+                img = processed_images[idx]
+                self.write_log(self.app.t("log_read_block", idx + 1, total_blocks))
                 
-                success = False
-                current_image = image
                 for attempt in range(max_retries):
-                    if self.app.stop_event.is_set(): break
+                    if self.app.stop_event.is_set(): return None
                     try:
-                        response = model.generate_content([active_prompt, current_image], safety_settings=safety_config)
+                        # Thêm delay nhỏ trước mỗi request nếu ở chế độ Eco/Balanced để tránh burst rate
+                        if self.config['delay'] > 0 and attempt == 0:
+                            time.sleep(self.config['delay'] * (idx % self.config['threads']))
+
+                        response = self.client.models.generate_content(
+                            model=model_id,
+                            contents=[active_prompt, img],
+                            config=types.GenerateContentConfig(
+                                safety_settings=safety_config
+                            )
+                        )
                         try:
                             text_result = response.text
                         except ValueError:
                             # Lỗi bản quyền / Safety filter
-                            if attempt < 5: 
-                                self.write_log(self.app.t("log_bypass_try", attempt + 1))
-                                current_image = self.transform_image_bypass(image, attempt + 1)
-                                time.sleep(2)
-                                continue
+                            if attempt < 5:
+                                transform_img = self.transform_image_bypass(img, attempt + 1)
+                                response = self.client.models.generate_content(
+                                    model=model_id,
+                                    contents=[active_prompt, transform_img],
+                                    config=types.GenerateContentConfig(
+                                        safety_settings=safety_config
+                                    )
+                                )
+                                text_result = response.text
                             else:
-                                self.write_log(self.app.t("log_reject", i+1))
-                                text_result = f"> **[COPYRIGHT BLOCK: PAGE {i+1}]**"
-                                full_markdown_content += f"\n\n\n\n{text_result}\n\n"
-                                success = True
-                                break
-                        
-                        text_result = text_result.replace("[^", f"[^p{i}_")
-                        full_markdown_content += f"\n\n\n\n{text_result}\n\n"
-                        success = True
+                                return (idx, f"\n\n\n\n> **[COPYRIGHT BLOCK: PAGE {idx + 1}]**\n\n")
 
-                        # Lưu checkpoint sau mỗi trang thành công
-                        self.save_checkpoint(pdf_path, i + 1, full_markdown_content, total_blocks)
-                        self.progress_signal.emit(i+1, total_blocks)
-                        
-                        if i < total_blocks - 1 and not self.app.stop_event.is_set():
-                            time.sleep(3) 
-                        break 
-                        
+                        text_result = text_result.replace("[^", f"[^p{idx}_")
+                        return (idx, f"\n\n\n\n{text_result}\n\n")
+
                     except Exception as e:
                         msg = str(e)
                         is_conn_error = any(kw in msg.lower() for kw in ["connection", "network", "timeout", "http"])
-                        
-                        if is_conn_error:
-                            self.write_log(self.app.t("log_net_error", msg))
-                            self.status_signal.emit(self.app.t("status_retrying"), True)
+                        is_rate_limit = any(kw in msg.lower() for kw in ["429", "quota", "too many requests"])
+
+                        if is_rate_limit:
+                            wait_time = (attempt + 1) * 10
+                            self.write_log(f"      [!] Rate Limit (429). Waiting {wait_time}s...")
+                            time.sleep(wait_time)
+                        elif is_conn_error:
+                            time.sleep(5)
                         else:
-                            self.write_log(self.app.t("log_err_attempt", attempt+1, max_retries, e))
+                            time.sleep(10)
                         
-                        if attempt < max_retries - 1:
-                            # Tối ưu: Đợi 5 giây thay vì 120 giây
-                            wait_time = 5 if is_conn_error else 30
-                            time.sleep(wait_time) 
-                            # Sau khi đợi xong, nếu là lỗi mạng thì reset trạng thái UI để thử lại
-                            if is_conn_error: self.status_signal.emit("", False)
-                        else:
-                            self.write_log(self.app.t("log_skip", i+1))
-                            self.status_signal.emit("", False)
-                
-                if self.app.stop_event.is_set(): break
+                        if attempt == max_retries - 1:
+                            return (idx, f"\n\n> **[PAGE {idx + 1} ERROR: {str(e)}]**\n\n")
+                return None
+
+            with ThreadPoolExecutor(max_workers=self.config['threads']) as executor:
+                futures = {executor.submit(process_page, i): i for i in range(file_resume_at, total_blocks)}
+                for future in as_completed(futures):
+                    if self.app.stop_event.is_set():
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
+                    
+                    res = future.result()
+                    if res:
+                        p_idx, p_text = res
+                        with self.checkpoint_lock:
+                            results_map[p_idx] = p_text
+                            while next_to_save in results_map:
+                                full_markdown_content += results_map[next_to_save]
+                                next_to_save += 1
+                                self.save_checkpoint(pdf_path, next_to_save, full_markdown_content, total_blocks)
+                                self.progress_signal.emit(next_to_save, total_blocks)
+
+            if self.app.stop_event.is_set(): break
 
             if full_markdown_content.strip() and not self.app.stop_event.is_set():
                 # Xóa checkpoint CHI KHI hoàn thành thực sự (không phải dừng)
@@ -880,7 +922,7 @@ class MergeWindow(QDialog):
         self.btn_export = QPushButton(self.app.t("export_pdf"))
         self.btn_export.setObjectName("Success")
         self.btn_export.setMinimumHeight(50)
-        self.btn_export.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        self.btn_export.setFont(QFont(".AppleSystemUIFont", 14, QFont.Weight.Bold))
         self.btn_export.clicked.connect(self.export_to_pdf)
         layout.addWidget(self.btn_export)
         
@@ -1028,6 +1070,7 @@ class PDFOCRApp(QMainWindow):
         self.solve_var = False
         self.cover_var = False
         self.merge_pages_var = False
+        self.speed_idx = 1 # Balanced by default
         self.load_config()
         self.stop_event = threading.Event()
         self.start_time = None
@@ -1071,6 +1114,7 @@ class PDFOCRApp(QMainWindow):
                     self.solve_var = data.get("solve", False)
                     self.cover_var = data.get("cover", False)
                     self.merge_pages_var = data.get("merge", False)
+                    self.speed_idx = data.get("speed", 1)
             except: pass
 
     def save_config(self):
@@ -1081,7 +1125,8 @@ class PDFOCRApp(QMainWindow):
                     "lang": self.current_lang,
                     "solve": self.solve_var,
                     "cover": self.cover_var,
-                    "merge": self.merge_pages_var
+                    "merge": self.merge_pages_var,
+                    "speed": self.speed_idx
                 }, f)
         except: pass
 
@@ -1105,9 +1150,8 @@ class PDFOCRApp(QMainWindow):
         menu_frame.setStyleSheet("background-color: rgba(128, 128, 128, 0.2);")
         menu_layout = QHBoxLayout(menu_frame)
         self.lbl_toolbar = QLabel("")
-        self.lbl_toolbar.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.lbl_toolbar.setFont(QFont(".AppleSystemUIFont", 12, QFont.Weight.Bold))
         self.btn_merge = QPushButton("")
-        self.btn_merge.setObjectName("Success")
         self.btn_merge.setMinimumHeight(40)
         self.btn_merge.clicked.connect(self.open_merge_popup)
         
@@ -1158,7 +1202,7 @@ class PDFOCRApp(QMainWindow):
         api_card = QFrame(); api_card.setObjectName("Card")
         api_layout = QHBoxLayout(api_card)
         self.lbl_api = QLabel("")
-        self.lbl_api.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self.lbl_api.setFont(QFont(".AppleSystemUIFont", 11, QFont.Weight.Bold))
         self.entry_api = QLineEdit()
         self.entry_api.setEchoMode(QLineEdit.EchoMode.Password)
         self.entry_api.setMinimumHeight(40)
@@ -1214,18 +1258,41 @@ class PDFOCRApp(QMainWindow):
         opt_layout.addStretch()
         content_layout.addLayout(opt_layout)
         
+        # SPEED CARD
+        speed_card = QFrame(); speed_card.setObjectName("Card")
+        speed_v_layout = QVBoxLayout(speed_card)
+        
+        speed_h_layout = QHBoxLayout()
+        self.lbl_speed_title = QLabel("")
+        self.lbl_speed_title.setFont(QFont(".AppleSystemUIFont", 11, QFont.Weight.Bold))
+        self.combo_speed = QComboBox()
+        self.combo_speed.addItems(["Eco (Safe / Chậm)", "Balanced (Standard / Cân bằng)", "Turbo (Max Speed / Nhanh)"])
+        self.combo_speed.setMinimumHeight(35)
+        self.combo_speed.currentIndexChanged.connect(self.on_speed_changed)
+        
+        speed_h_layout.addWidget(self.lbl_speed_title)
+        speed_h_layout.addWidget(self.combo_speed, 1)
+        
+        self.lbl_speed_desc = QLabel("")
+        self.lbl_speed_desc.setStyleSheet("color: #666; font-size: 12px;")
+        self.lbl_speed_desc.setWordWrap(True)
+        
+        speed_v_layout.addLayout(speed_h_layout)
+        speed_v_layout.addWidget(self.lbl_speed_desc)
+        content_layout.addWidget(speed_card)
+        
         # BUTTONS
         btn_layout = QHBoxLayout()
         self.btn_start = QPushButton("")
         self.btn_start.setObjectName("Primary")
         self.btn_start.setMinimumHeight(60)
-        self.btn_start.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.btn_start.setFont(QFont(".AppleSystemUIFont", 16, QFont.Weight.Bold))
         self.btn_start.clicked.connect(self.start_processing)
         
         self.btn_stop = QPushButton("")
         self.btn_stop.setObjectName("Danger")
         self.btn_stop.setMinimumHeight(60)
-        self.btn_stop.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.btn_stop.setFont(QFont(".AppleSystemUIFont", 16, QFont.Weight.Bold))
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self.stop_processing)
         
@@ -1236,7 +1303,7 @@ class PDFOCRApp(QMainWindow):
         # TIMER
         self.lbl_timer = QLabel("")
         self.lbl_timer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_timer.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        self.lbl_timer.setFont(QFont(".AppleSystemUIFont", 14, QFont.Weight.Bold))
         self.lbl_timer.setStyleSheet("color: #3a7ebf;")
         content_layout.addWidget(self.lbl_timer)
 
@@ -1252,7 +1319,7 @@ class PDFOCRApp(QMainWindow):
         # LOG
         self.log_box = QTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setFont(QFont("Consolas", 13))
+        self.log_box.setFont(QFont("Menlo", 13))
         self.log_box.setObjectName("Card")
         content_layout.addWidget(self.log_box)
 
@@ -1274,6 +1341,15 @@ class PDFOCRApp(QMainWindow):
         self.merge_pages_var = self.chk_merge_pages.isChecked()
         self.save_config()
 
+    def on_speed_changed(self, index):
+        self.speed_idx = index
+        self.save_config()
+        self.update_speed_description()
+
+    def update_speed_description(self):
+        desc_keys = ["desc_eco", "desc_balanced", "desc_turbo"]
+        self.lbl_speed_desc.setText(self.t(desc_keys[self.speed_idx]))
+
     def update_ui_texts(self):
         self.setWindowTitle(self.t("title") + " v" + CURRENT_VERSION)
         self.lbl_toolbar.setText(self.t("toolbar"))
@@ -1294,6 +1370,13 @@ class PDFOCRApp(QMainWindow):
         self.chk_merge_pages.setText(self.t("merge_opt"))
         self.chk_merge_pages.setChecked(self.merge_pages_var)
         
+        self.lbl_speed_title.setText(self.t("speed_label"))
+        
+        self.combo_speed.blockSignals(True)
+        self.combo_speed.setCurrentIndex(self.speed_idx)
+        self.combo_speed.blockSignals(False)
+        self.update_speed_description()
+
         self.btn_start.setText(self.t("start"))
         self.btn_stop.setText(self.t("stop"))
         
@@ -1409,7 +1492,7 @@ class PDFOCRApp(QMainWindow):
         self.btn_stop.setEnabled(True)
         self.stop_event.clear()
         
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
         
         mode = self.t("mode_single") if self.btn_mode_single.isChecked() else self.t("mode_batch")
         
@@ -1438,7 +1521,7 @@ class PDFOCRApp(QMainWindow):
                                 if os.path.exists(cp_path): os.remove(cp_path)
                 except: pass
 
-        self.worker = WorkerThread(self, input_path, output_dir, mode, resume_at, initial_content)
+        self.worker = WorkerThread(self, input_path, output_dir, mode, resume_at, initial_content, self.speed_idx, self.client)
         self.worker.log_signal.connect(self.write_log)
         self.worker.progress_signal.connect(self.update_progress)
         self.worker.status_signal.connect(self.handle_status)
@@ -1627,7 +1710,17 @@ rm "$0"
         self.merge_window = MergeWindow(self)
         self.merge_window.exec()
 
+def _qt_message_handler(mode, context, message):
+    msg = str(message)
+    if "accessibilityLabel on invalid object" in msg: return
+    if "Populating font family aliases" in msg: return
+    if "Could not parse stylesheet" in msg: return
+    print(msg)
+
 if __name__ == "__main__":
+    from PyQt6.QtCore import qInstallMessageHandler
+    qInstallMessageHandler(_qt_message_handler)
+    
     app = QApplication(sys.argv)
     window = PDFOCRApp()
     window.show()
