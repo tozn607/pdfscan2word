@@ -979,7 +979,7 @@ class DownloadUpdateThread(QThread):
             
             if sys.platform == "darwin":
                 import subprocess
-                subprocess.run(["unzip", "-q", "-o", zip_path, "-d", temp_dir], check=True)
+                subprocess.run(["ditto", "-xk", zip_path, temp_dir], check=True)
             else:
                 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
