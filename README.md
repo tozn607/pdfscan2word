@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📄 PDFScan2Word (v2.0.0)
+# 📄 PDFScan2Word (v2.2.0)
 
 **[🇻🇳 Tiếng Việt](#-tiếng-việt) • [🇺🇸 English](#-english)**
 
@@ -20,17 +20,18 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 
 ## 🇻🇳 Tiếng Việt
 
-### 🚀 Có gì mới trong bản v2.0.0?
-Phiên bản này mang lại những nâng cấp quan trọng và toàn diện:
-- **Loại bỏ phụ thuộc hệ thống:** Chuyển sang sử dụng `PyMuPDF`, hoàn toàn không cần cài đặt Poppler. Pandoc được tự động tích hợp, giúp đơn giản hóa quy trình thiết lập cho người dùng.
-- **Giao diện hiện đại:** Thiết kế mới theo phong cách thẻ (card-based), hỗ trợ Native Dark Mode và tối ưu hóa trải nghiệm người dùng.
-- **Hỗ trợ đa ngôn ngữ:** Giao diện hoàn thiện bằng cả tiếng Anh và tiếng Việt, bao gồm trình chọn ngôn ngữ trong lần đầu sử dụng.
-- **Giải bài tập bằng AI:** Tính năng mới tự động nhận diện các câu hỏi/bài tập trong tài liệu scan và cung cấp lời giải chi tiết đính kèm cuối văn bản.
-- **Bản build đóng gói sẵn:** Cung cấp file chạy trực tiếp cho Windows và macOS (cả chip Apple Silicon và Intel) mà không cần cài đặt môi trường Python.
+### 🚀 Có gì mới trong bản v2.2.0?
+Phiên bản này tập trung vào hiệu suất và sự ổn định:
+- **Xử lý Song song:** Tăng siêu tốc độ quét (scan) bằng cách xử lý đồng thời nhiều trang PDF, thay vì xử lý tuần tự từng trang.
+- **Tùy chỉnh Tốc độ:** Thêm lựa chọn "Tốc độ xử lý" với 3 mức (Eco, Balanced, Turbo) giúp tối ưu hóa quota API cho cả tài khoản Free và Paid.
+- **Nâng cấp SDK Gemini:** Chuyển đổi sang thư viện `google-genai` mới nhất của Google để đảm bảo hiệu năng và hỗ trợ lâu dài.
+- **Cải thiện độ ổn định:** Hệ thống tự động lắp ráp trang theo đúng thứ tự bản gốc kể cả khi xử lý song song, đồng thời tối ưu chiến lược backoff khi gặp lỗi giới hạn API (429).
+- **Trải nghiệm Native:** Sử dụng font chữ hệ thống trên macOS và khắc phục triệt để các cảnh báo console liên quan đến accessibility.
 
 ### ✨ Tính năng nổi bật
 - **Bảo toàn định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách, định dạng chữ đậm/nghiêng trực tiếp qua PyPandoc.
 - **Khôi phục văn bản thông minh:** Sử dụng Gemini 3.1 Flash để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
+- **Giải bài tập bằng AI:** Tự động nhận diện các câu hỏi/bài tập trong tài liệu scan và cung cấp lời giải chi tiết đính kèm cuối văn bản.
 - **Xử lý hàng loạt:** Chuyển đổi toàn bộ thư mục PDF chỉ với một thao tác duy nhất.
 - **Công cụ tạo PDF từ ảnh:** Tích hợp tiện ích gộp, nén và tối ưu hóa các định dạng `.heic`, `.jpg`, `.png` thành một file PDF duy nhất.
 - **Xử lý trang đôi:** Tự động nhận diện và cắt đôi các bản quét sách định dạng A5 (hai trang trên một mặt scan).
@@ -65,17 +66,18 @@ python main.py
 
 ## 🇺🇸 English
 
-### 🚀 What's New in v2.0.0?
-This major update brings a complete overhaul to the application:
-- **No System Dependencies Required:** We completely replaced `pdf2image` with `PyMuPDF`, meaning Poppler is no longer required! Pandoc is also automatically fetched if not detected.
-- **Modernized UI:** A brand new, sleek, card-based interface with native Dark Mode support and responsive design.
-- **Bilingual Support:** Full English & Vietnamese UI, featuring a first-time setup language selector.
-- **AI Exercise Solver:** A brand new option that automatically detects exercises in the scan and appends fully mathematical/worked-out solutions!
-- **Cross-Platform Pre-built Binaries:** Automatically built via GitHub Actions. Now available natively for Windows, macOS (Apple Silicon M1/M2/M3), and macOS (Intel).
+### 🚀 What's New in v2.2.0?
+This update focuses on performance, speed, and reliability:
+- **Parallel Execution:** Scanning speed is multiplied. The core engine now processes multiple PDF pages concurrently rather than one by one.
+- **Processing Speed Controls:** New "Processing Speed" card with 3 selectable tiers (Eco, Balanced, Turbo) to optimize API quota usage for both Free and Paid accounts.
+- **Modernized Gemini SDK:** Fully migrated to the new `google-genai` SDK for increased stability and future-proofing.
+- **Perfect Page Assembly:** Guaranteed reassembly of pages in the exact original sequence even during high-speed parallel processing.
+- **Native UI & Stability:** Native macOS system font support and improved rate-limit protection with smarter exponential backoff strategies.
 
 ### ✨ Key Features
 - **Format Preservation:** Maintains bullet points, numbered lists, bold/italic text, and tables natively in Word using PyPandoc.
 - **Smart Text Recovery:** Uses Google's Gemini 3.1 Flash to infer and fill in text cut-off at the page edges—perfect for thick university textbooks or legal docs.
+- **AI Exercise Solver:** Automatically detects exercises in the scan and appends fully mathematical/worked-out solutions!
 - **Batch Processing:** Convert entire folders of PDFs with a single click.
 - **Image to PDF Maker:** Includes a built-in utility to merge, compress, and enhance `.heic`, `.jpg`, `.png` into a single PDF.
 - **Left-Right Page Splitting:** Scans 2 pages (like an A5 book spread) at once to speed up processing.
