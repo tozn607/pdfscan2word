@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📄 PDFScan2Word (v2.2.0)
+# 📄 PDFScan2Word
 
 **[🇻🇳 Tiếng Việt](#-tiếng-việt) • [🇺🇸 English](#-english)**
 
@@ -20,23 +20,20 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 
 ## 🇻🇳 Tiếng Việt
 
-### 🚀 Có gì mới trong bản v2.2.0?
-Phiên bản này tập trung vào hiệu suất và sự ổn định:
-- **Xử lý Song song:** Tăng siêu tốc độ quét (scan) bằng cách xử lý đồng thời nhiều trang PDF, thay vì xử lý tuần tự từng trang.
-- **Tùy chỉnh Tốc độ:** Thêm lựa chọn "Tốc độ xử lý" với 3 mức (Eco, Balanced, Turbo) giúp tối ưu hóa quota API cho cả tài khoản Free và Paid.
-- **Hệ thống Cập nhật:** Tích hợp nút Cập nhật và Menu quản lý phiên bản mới ngay trong thanh công cụ, hỗ trợ kiểm tra và tải bản cập nhật trực tiếp.
-- **Truy cập Repository:** Thêm liên kết nhanh đến GitHub ngay trong Menu Cập nhật để người dùng dễ dàng theo dõi mã nguồn và tài liệu.
-- **Nâng cấp SDK Gemini:** Chuyển đổi sang thư viện `google-genai` mới nhất của Google để đảm bảo hiệu năng và hỗ trợ lâu dài.
-- **Cải thiện độ ổn định:** Hệ thống tự động lắp ráp trang theo đúng thứ tự bản gốc kể cả khi xử lý song song, đồng thời tối ưu chiến lược backoff khi gặp lỗi giới hạn API (429).
-- **Trải nghiệm Native:** Sử dụng font chữ hệ thống trên macOS và khắc phục triệt để các cảnh báo console liên quan đến accessibility.
-
 ### ✨ Tính năng nổi bật
 - **Bảo toàn định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách, định dạng chữ đậm/nghiêng trực tiếp qua PyPandoc.
-- **Khôi phục văn bản thông minh:** Sử dụng Gemini 3.1 Flash để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
+- **Khôi phục văn bản thông minh:** Sử dụng Google Gemini 3.1 Flash để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
 - **Giải bài tập bằng AI:** Tự động nhận diện các câu hỏi/bài tập trong tài liệu scan và cung cấp lời giải chi tiết đính kèm cuối văn bản.
+- **Xử lý Song song Siêu tốc:** Tự động xử lý cùng lúc nhiều trang PDF để tối ưu hóa thời gian quét.
+- **Tùy chỉnh Tốc độ:** 3 mức xử lý (Eco, Balanced, Turbo) giúp tối ưu hóa quota API cho cả tài khoản Free và Paid.
 - **Xử lý hàng loạt:** Chuyển đổi toàn bộ thư mục PDF chỉ với một thao tác duy nhất.
-- **Công cụ tạo PDF từ ảnh:** Tích hợp tiện ích gộp, nén và tối ưu hóa các định dạng `.heic`, `.jpg`, `.png` thành một file PDF duy nhất.
-- **Xử lý trang đôi:** Tự động nhận diện và cắt đôi các bản quét sách định dạng A5 (hai trang trên một mặt scan).
+- **Hệ thống Cập nhật:** Tích hợp kiểm tra và tải bản cập nhật trực tiếp ngay trong ứng dụng.
+- **Công cụ tạo PDF từ ảnh:** Tiện ích gộp, nén và tối ưu hóa các định dạng `.heic`, `.jpg`, `.png` thành một file PDF duy nhất.
+- **Xử lý trang đôi:** Tự động nhận diện và cắt đôi các bản quét sách định dạng A5.
+
+### 📜 Nhật ký thay đổi
+Để xem chi tiết các thay đổi trong từng phiên bản, vui lòng truy cập trang [Releases](https://github.com/tozn607/pdfscan2word/releases).
+
 
 ### ⚙️ Hướng dẫn cài đặt (Khuyên dùng)
 Người dùng thông thường có thể sử dụng ứng dụng ngay mà không cần cài đặt môi trường lập trình:
@@ -68,23 +65,20 @@ python main.py
 
 ## 🇺🇸 English
 
-### 🚀 What's New in v2.2.0?
-This update focuses on performance, speed, and reliability:
-- **Parallel Execution:** Scanning speed is multiplied. The core engine now processes multiple PDF pages concurrently rather than one by one.
-- **Processing Speed Controls:** New "Processing Speed" card with 3 selectable tiers (Eco, Balanced, Turbo) to optimize API quota usage for both Free and Paid accounts.
-- **Integrated Update System:** Added an Update button and version management menu within the app for manual checks and easy installations.
-- **Direct Repository Link:** Quick access to the GitHub project page directly from the Update Menu.
-- **Modernized Gemini SDK:** Fully migrated to the new `google-genai` SDK for increased stability and future-proofing.
-- **Perfect Page Assembly:** Guaranteed reassembly of pages in the exact original sequence even during high-speed parallel processing.
-- **Native UI & Stability:** Native macOS system font support and improved rate-limit protection with smarter exponential backoff strategies.
-
 ### ✨ Key Features
 - **Format Preservation:** Maintains bullet points, numbered lists, bold/italic text, and tables natively in Word using PyPandoc.
-- **Smart Text Recovery:** Uses Google's Gemini 3.1 Flash to infer and fill in text cut-off at the page edges—perfect for thick university textbooks or legal docs.
-- **AI Exercise Solver:** Automatically detects exercises in the scan and appends fully mathematical/worked-out solutions!
+- **Smart Text Recovery:** Uses Google's Gemini 3.1 Flash to infer and fill in text cut-off at the page edges—perfect for thick books.
+- **AI Exercise Solver:** Automatically detects exercises in the scan and appends worked-out solutions!
+- **High-Speed Parallel Processing:** Maximum efficiency by processing multiple PDF pages concurrently.
+- **Processing Speed Controls:** 3 selectable tiers (Eco, Balanced, Turbo) to optimize API quota usage for all account types.
 - **Batch Processing:** Convert entire folders of PDFs with a single click.
-- **Image to PDF Maker:** Includes a built-in utility to merge, compress, and enhance `.heic`, `.jpg`, `.png` into a single PDF.
-- **Left-Right Page Splitting:** Scans 2 pages (like an A5 book spread) at once to speed up processing.
+- **Auto-Update System:** Built-in version management and easy update notifications.
+- **Image to PDF Maker:** Built-in utility to merge, compress, and enhance `.heic`, `.jpg`, `.png` into a single PDF.
+- **Left-Right Page Splitting:** Intelligent processing for A5 book spreads.
+
+### 📜 Release Notes
+To see a detailed list of changes for each version, please visit the [Releases](https://github.com/tozn607/pdfscan2word/releases) page.
+
 
 ### ⚙️ Quick Installation (Recommended)
 You don't need to know Python to use this app. Just download the pre-built application:
