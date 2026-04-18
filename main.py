@@ -145,7 +145,8 @@ STRINGS = {
         "output_ph": "Trống = Tự động lưu cùng nơi với Input",
         "solve_opt": "🤖 AI Giải bài tập",
         "cover_opt": "🖼️ Lưu riêng trang bìa",
-        "merge_opt": "📖 Gộp 2 trang làm 1 (Sách A5)",
+        "merge_opt": "📖 Gộp cặp trang (Tăng tốc & Tiết kiệm)",
+        "merge_desc": "Bỏ chọn nếu: 1) Ảnh gốc đã chứa 2 trang; hoặc 2) Chữ trong trang đơn quá dày đặc.",
         "start": "▶ BẮT ĐẦU XỬ LÝ",
         "stop": "⏹ DỪNG LẠI",
         "timer": "Thời gian xử lý: {0:02d}:{1:02d}",
@@ -238,7 +239,8 @@ STRINGS = {
         "output_ph": "Empty = Auto save next to Input",
         "solve_opt": "🤖 AI Solves Exercises",
         "cover_opt": "🖼️ Save cover separately",
-        "merge_opt": "📖 Merge 2 pages (A5 books)",
+        "merge_opt": "📖 Merge page pairs (Faster & Cheaper)",
+        "merge_desc": "Uncheck if: 1) Photos already contain 2 pages; or 2) Text in a single page is too dense.",
         "start": "▶ START PROCESSING",
         "stop": "⏹ STOP",
         "timer": "Processing time: {0:02d}:{1:02d}",
@@ -1229,7 +1231,7 @@ class PDFOCRApp(QMainWindow):
         self.current_lang = "VN" # Default
         self.solve_var = False
         self.cover_var = False
-        self.merge_pages_var = False
+        self.merge_pages_var = True
         self.speed_idx = 1 # Balanced by default
         self.load_config()
         self.stop_event = threading.Event()
@@ -1237,8 +1239,8 @@ class PDFOCRApp(QMainWindow):
         self.timer_running = False
 
         self.setWindowTitle(self.t("title") + " v" + CURRENT_VERSION)
-        self.setMinimumSize(600, 500)
-        self.resize(840, 750)
+        self.setMinimumSize(700, 750)
+        self.resize(840, 800)
         self.setStyleSheet(QSS)
         
         self.latest_version = None
@@ -1279,7 +1281,7 @@ class PDFOCRApp(QMainWindow):
                     self.current_lang = data.get("lang", "VN")
                     self.solve_var = data.get("solve", False)
                     self.cover_var = data.get("cover", False)
-                    self.merge_pages_var = data.get("merge", False)
+                    self.merge_pages_var = data.get("merge", True)
                     self.speed_idx = data.get("speed", 1)
             except: pass
 
@@ -1313,8 +1315,10 @@ class PDFOCRApp(QMainWindow):
         
         # Menu frame
         menu_frame = QFrame()
-        menu_frame.setStyleSheet("background-color: rgba(128, 128, 128, 0.2);")
+        menu_frame.setStyleSheet("background-color: rgba(128, 128, 128, 0.12); border-bottom: 1px solid rgba(128, 128, 128, 0.2);")
         menu_layout = QHBoxLayout(menu_frame)
+        menu_layout.setContentsMargins(20, 10, 20, 10)
+        menu_layout.setSpacing(12)
         self.lbl_toolbar = QLabel("")
         self.lbl_toolbar.setFont(QFont(".AppleSystemUIFont", 12, QFont.Weight.Bold))
         self.btn_merge = QPushButton("")
@@ -1348,6 +1352,7 @@ class PDFOCRApp(QMainWindow):
         # Content 
         content_layout = QVBoxLayout()
         content_layout.setContentsMargins(25, 20, 25, 20)
+        content_layout.setSpacing(12)
         main_layout.addLayout(content_layout)
 
         # Segmented Button (Mode)
@@ -1368,7 +1373,6 @@ class PDFOCRApp(QMainWindow):
         mode_layout.addWidget(self.btn_mode_single)
         mode_layout.addWidget(self.btn_mode_batch)
         content_layout.addLayout(mode_layout)
-
         # API KEY CARD
         api_card = QFrame(); api_card.setObjectName("Card")
         api_layout = QHBoxLayout(api_card)
@@ -1385,7 +1389,6 @@ class PDFOCRApp(QMainWindow):
         api_layout.addWidget(self.entry_api)
         api_layout.addWidget(self.btn_load_api)
         content_layout.addWidget(api_card)
-
         # I/O CARD
         io_card = QFrame(); io_card.setObjectName("Card")
         io_layout = QVBoxLayout(io_card)
@@ -1411,21 +1414,31 @@ class PDFOCRApp(QMainWindow):
         o_layout.addWidget(self.entry_output)
         
         io_layout.addLayout(i_layout)
+        io_layout.addSpacing(10)
         io_layout.addLayout(o_layout)
         content_layout.addWidget(io_card)
         
         # OPTIONS
+        # Merge Option (Primary/New line)
+        self.chk_merge_pages = QCheckBox("")
+        self.chk_merge_pages.setFont(QFont(".AppleSystemUIFont", 12, QFont.Weight.Bold))
+        self.chk_merge_pages.toggled.connect(self.update_options)
+        
+        self.lbl_merge_desc = QLabel("")
+        self.lbl_merge_desc.setWordWrap(True)
+        self.lbl_merge_desc.setStyleSheet("color: #666; font-size: 12px; margin-left: 28px; margin-top: 2px;")
+        
+        content_layout.addWidget(self.chk_merge_pages)
+        content_layout.addWidget(self.lbl_merge_desc)
+
         opt_layout = QHBoxLayout()
         self.chk_solve = QCheckBox("")
         self.chk_solve.toggled.connect(self.update_options)
         self.chk_cover = QCheckBox("")
         self.chk_cover.toggled.connect(self.update_options)
-        self.chk_merge_pages = QCheckBox("")
-        self.chk_merge_pages.toggled.connect(self.update_options)
         
         opt_layout.addWidget(self.chk_solve)
         opt_layout.addWidget(self.chk_cover)
-        opt_layout.addWidget(self.chk_merge_pages)
         opt_layout.addStretch()
         content_layout.addLayout(opt_layout)
         
@@ -1537,6 +1550,7 @@ class PDFOCRApp(QMainWindow):
         self.chk_cover.setChecked(self.cover_var)
         self.chk_merge_pages.setText(self.t("merge_opt"))
         self.chk_merge_pages.setChecked(self.merge_pages_var)
+        self.lbl_merge_desc.setText(self.t("merge_desc"))
         
         self.lbl_speed_title.setText(self.t("speed_label"))
         
