@@ -45,6 +45,18 @@ Người dùng thông thường có thể sử dụng ứng dụng ngay mà khô
 3. Giải nén và khởi chạy ứng dụng.
 > **Lưu ý cho macOS:** Trong trường hợp hệ thống báo lỗi "app is damaged", vui lòng mở Terminal và chạy lệnh: `xattr -cr /đường-dẫn-đến/PDFScan2Word.app`
 
+### 💡 Hướng dẫn sử dụng
+1. **Lấy API Key:** Truy cập [Google AI Studio](https://aistudio.google.com/) để nhận mã API miễn phí.
+2. **Cấu hình:** Dán API Key vào ô cấu hình. Key sẽ được mã hóa và lưu trữ tự động cho các lần sau.
+3. **Chọn chế độ:**
+   - **Single Mode:** Click "Chọn File PDF" để chọn 1 file duy nhất.
+   - **Batch Mode:** Click "Thư mục Input" để chọn thư mục chứa nhiều file.
+4. **Tùy chọn bổ sung:** 
+   - Tích chọn **AI Giải bài tập** nếu muốn AI tự động trả lời câu hỏi trong tài liệu.
+   - Tích chọn **Gộp 2 trang** nếu tài liệu là dạng sách chụp trang đôi (A5).
+   - Chọn tốc độ (Eco/Turbo) tùy theo loại API Key bạn có.
+5. **Xử lý:** Nhấn **START PROCESSING**. File `.docx` kết quả sẽ được lưu cùng thư mục với file gốc (nếu bạn để trống ô Output).
+
 ### 💻 Chạy từ mã nguồn
 Dành cho lập trình viên muốn tùy chỉnh hoặc phát triển thêm:
 ```bash
@@ -54,12 +66,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 💡 Hướng dẫn sử dụng
-1. Đăng ký API Key miễn phí tại [Google AI Studio](https://aistudio.google.com/).
-2. Khởi động ứng dụng và chọn ngôn ngữ ưu tiên.
-3. Nhập API Key vào ô cấu hình (Key sẽ được lưu tự động cho các lần sau).
-4. Chọn chế độ **Single Mode** (xử lý 1 file) hoặc **Batch Mode** (xử lý cả thư mục).
-5. Chọn file/thư mục đầu vào và nhấn **START PROCESSING**. Kết quả sẽ được tự động lưu dưới định dạng `.docx`.
 
 ---
 
@@ -90,6 +96,18 @@ You don't need to know Python to use this app. Just download the pre-built appli
 3. Extract and run!
 > **macOS Quarantine Note:** If macOS prevents the app from opening by saying "app is damaged", open Terminal and run: `xattr -cr /path/to/extracted/PDFScan2Word.app`
 
+### 💡 How to Use
+1. **Get API Key:** Obtain a free key from [Google AI Studio](https://aistudio.google.com/).
+2. **Setup:** Paste your API Key into the configuration field. It will be encrypted and saved locally for future use.
+3. **Select Mode:**
+   - **Single Mode:** Click "Select PDF" to process one specific document.
+   - **Batch Mode:** Click "Input Folder" to convert an entire directory of PDFs.
+4. **Configure Options:**
+   - Enable **AI Solves Exercises** to have Gemini automatically answer questions found in the document.
+   - Enable **Merge 2 pages** for A5 book spreads (two pages on one scan).
+   - Adjust **Processing Speed** based on your API limits (Eco for free, Turbo for paid).
+5. **Convert:** Click **START PROCESSING**. The resulting `.docx` file will be auto-saved in the same directory as the input (unless a custom Output folder is specified).
+
 ### 💻 Running from Source
 If you are a developer and want to run it from the code:
 ```bash
@@ -99,12 +117,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 💡 How to Use
-1. Get a free API Key from [Google AI Studio](https://aistudio.google.com/).
-2. Open the app, select your preferred language (English).
-3. Paste the API Key in the field.
-4. Select "Single Mode" (1 file) or "Batch Mode" (folder).
-5. Add your inputs and click **START PROCESSING**. It will auto-save the `.docx` file!
 
 ---
 
