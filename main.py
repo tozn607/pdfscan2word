@@ -787,29 +787,27 @@ class WorkerThread(QThread):
                         if self.config['delay'] > 0 and attempt == 0:
                             time.sleep(self.config['delay'] * (idx % self.config['threads']))
 
+                        # Dùng ảnh đã qua xử lý bypass (nếu đang ở các lần thử lại sau khi bị lỗi NoneType)
+                        current_img = self.transform_image_bypass(img, attempt)
+
                         response = self.client.models.generate_content(
                             model=model_id,
-                            contents=[active_prompt, img],
+                            contents=[active_prompt, current_img],
                             config=types.GenerateContentConfig(
                                 safety_settings=safety_config
                             )
                         )
-                        try:
-                            text_result = response.text
-                        except ValueError:
-                            # Lỗi bản quyền / Safety filter
-                            if attempt < 5:
-                                transform_img = self.transform_image_bypass(img, attempt + 1)
-                                response = self.client.models.generate_content(
-                                    model=model_id,
-                                    contents=[active_prompt, transform_img],
-                                    config=types.GenerateContentConfig(
-                                        safety_settings=safety_config
-                                    )
-                                )
-                                text_result = response.text
+                        
+                        text_result = response.text
+                        
+                        # Fix lỗi NoneType: Nếu API trả về rỗng (thường do bộ lọc an toàn/bản quyền chặn ngầm)
+                        if not text_result:
+                            if attempt >= 5: 
+                                # Thử lách luật bằng ảnh mới 5 lần không được thì ghi chú vào Word và bỏ qua trang
+                                return (idx, f"\n\n\n\n> **[COPYRIGHT/SAFETY BLOCK: TRANG {idx + 1}]**\n\n")
                             else:
-                                return (idx, f"\n\n\n\n> **[COPYRIGHT BLOCK: PAGE {idx + 1}]**\n\n")
+                                # Chủ động gây lỗi để vòng lặp tự động chuyển sang chế độ Transform Bypass ở lần lặp sau
+                                raise ValueError("Empty API response (Safety/Copyright blocked). Triggering Bypass.")
 
                         text_result = text_result.replace("[^", f"[^p{idx}_")
                         return (idx, f"\n\n\n\n{text_result}\n\n")
