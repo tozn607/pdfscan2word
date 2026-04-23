@@ -17,6 +17,7 @@ from docx.shared import Pt, Cm
 from datetime import datetime
 import json
 from PIL import Image, ImageEnhance
+Image.init()
 import ssl
 import hashlib
 
