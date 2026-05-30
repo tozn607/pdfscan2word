@@ -45,7 +45,7 @@ try:
 except ImportError:
     print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
-CURRENT_VERSION = "2.2.2"
+CURRENT_VERSION = "2.3.0"
 GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
@@ -660,7 +660,7 @@ class WorkerThread(QThread):
 
         total_files = len(pdf_files)
         self.write_log(self.app.t("log_start_batch", total_files))
-        model_id = 'gemini-3.1-flash-lite-preview'
+        model_id = 'gemini-3.1-flash-lite'
 
         active_prompt = PROMPT_EN if self.app.current_lang == "EN" else PROMPT_VN
         if self.app.solve_var:
