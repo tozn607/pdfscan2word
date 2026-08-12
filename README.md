@@ -6,7 +6,7 @@
 
 ![GitHub release](https://img.shields.io/github/v/release/tozn607/pdfscan2word?color=success)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
-![AI](https://img.shields.io/badge/AI-Google_Gemini_3.1-orange)
+![AI](https://img.shields.io/badge/AI-Google_Gemini_3.5-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into fully formatted Word (`.docx`) documents.  
@@ -22,7 +22,7 @@ A powerful, AI-driven Desktop application to digitize scanned PDFs & Images into
 
 ### ✨ Tính năng nổi bật
 - **Bảo toàn định dạng:** Nhận diện và giữ nguyên cấu trúc bảng biểu, danh sách, định dạng chữ đậm/nghiêng trực tiếp qua PyPandoc.
-- **Khôi phục văn bản thông minh:** Sử dụng Google Gemini 3.1 Flash để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
+- **Khôi phục văn bản thông minh:** Sử dụng Google Gemini 3.5 Flash Lite để suy luận và điền chính xác các phần văn bản bị mất do lỗi quét hoặc mép giấy bị che khuất.
 - **Giải bài tập bằng AI:** Tự động nhận diện các câu hỏi/bài tập trong tài liệu scan và cung cấp lời giải chi tiết đính kèm cuối văn bản.
 - **Xử lý Song song Siêu tốc:** Tự động xử lý cùng lúc nhiều trang PDF để tối ưu hóa thời gian quét.
 - **Tùy chỉnh Tốc độ:** 3 mức xử lý (Eco, Balanced, Turbo) giúp tối ưu hóa quota API cho cả tài khoản Free và Paid.
@@ -73,7 +73,7 @@ python main.py
 
 ### ✨ Key Features
 - **Format Preservation:** Maintains bullet points, numbered lists, bold/italic text, and tables natively in Word using PyPandoc.
-- **Smart Text Recovery:** Uses Google's Gemini 3.1 Flash to infer and fill in text cut-off at the page edges—perfect for thick books.
+- **Smart Text Recovery:** Uses Google's Gemini 3.5 Flash Lite to infer and fill in text cut-off at the page edges—perfect for thick books.
 - **AI Exercise Solver:** Automatically detects exercises in the scan and appends worked-out solutions!
 - **High-Speed Parallel Processing:** Maximum efficiency by processing multiple PDF pages concurrently.
 - **Processing Speed Controls:** 3 selectable tiers (Eco, Balanced, Turbo) to optimize API quota usage for all account types.

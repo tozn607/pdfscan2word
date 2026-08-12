@@ -45,7 +45,7 @@ try:
 except ImportError:
     print("[!] CẢNH BÁO: Chưa cài đặt pillow-heif. Không thể đọc file HEIC.")
 
-CURRENT_VERSION = "2.3.0"
+CURRENT_VERSION = "2.4.0"
 GITHUB_API_URL = "https://api.github.com/repos/tozn607/pdfscan2word/releases/latest"
 RELEASES_URL = "https://github.com/tozn607/pdfscan2word/releases"
 
@@ -660,7 +660,7 @@ class WorkerThread(QThread):
 
         total_files = len(pdf_files)
         self.write_log(self.app.t("log_start_batch", total_files))
-        model_id = 'gemini-3.1-flash-lite'
+        model_id = 'gemini-3.5-flash-lite'
 
         active_prompt = PROMPT_EN if self.app.current_lang == "EN" else PROMPT_VN
         if self.app.solve_var:
@@ -686,7 +686,23 @@ class WorkerThread(QThread):
                     pypandoc.get_pandoc_version()
                 except OSError:
                     self.write_log(self.app.t("log_pandoc"))
-                    pypandoc.download_pandoc(targetfolder=CONFIG_DIR, download_folder=CONFIG_DIR)
+                    if sys.platform == "darwin" and platform.machine() == "arm64":
+                        import urllib.request
+                        import zipfile
+                        import shutil
+                        url = "https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-arm64-macOS.zip"
+                        zip_path = os.path.join(CONFIG_DIR, "pandoc-arm64.zip")
+                        urllib.request.urlretrieve(url, zip_path)
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extract("pandoc-3.10-arm64/bin/pandoc", CONFIG_DIR)
+                        shutil.move(os.path.join(CONFIG_DIR, "pandoc-3.10-arm64", "bin", "pandoc"), pandoc_exe)
+                        os.chmod(pandoc_exe, 0o755)
+                        try: shutil.rmtree(os.path.join(CONFIG_DIR, "pandoc-3.10-arm64"))
+                        except: pass
+                        try: os.remove(zip_path)
+                        except: pass
+                    else:
+                        pypandoc.download_pandoc(targetfolder=CONFIG_DIR, download_folder=CONFIG_DIR)
                     os.environ['PYPANDOC_PANDOC'] = pandoc_exe
 
                 doc = fitz.open(pdf_path)
@@ -893,6 +909,7 @@ class WorkerThread(QThread):
                     md_path = output_docx_path.replace('.docx', '.md')
                     with open(md_path, 'w', encoding='utf-8') as f: 
                         f.write(full_markdown_content)
+                    self.write_log(f"  [!] Conversion error: {str(e)}")
                     self.write_log(self.app.t("log_rescue", md_path))
             
             if self.app.stop_event.is_set():
